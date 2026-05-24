@@ -2,7 +2,7 @@
 id: CHANGE-WA-001
 task: TASK-WA-001
 prioridade: P2
-status: pending
+status: done
 modulo: whatsapp
 pagina: WhatsAppPage
 arquivos:
@@ -17,11 +17,11 @@ depende-de: []
 Botões de ação no painel direito da aba Atendimentos têm espaçamento inconsistente — UX degradada durante atendimento ao cliente.
 
 ## O que implementar
-- [ ] Inspecionar painel direito (360px): identificar onde gap/padding está irregular
-- [ ] Aplicar `gap-2` uniforme entre botões de ação primários
-- [ ] Botões de ação secundários (menor destaque): `gap-1.5`
-- [ ] Verificar alinhamento vertical de ícone + label em cada botão
-- [ ] Garantir que botões não sobrepõem em viewport padrão (1280px)
+- [x] Inspecionar painel direito (360px): identificar onde gap/padding está irregular
+- [x] Aplicar `gap-2` uniforme entre botões de ação primários
+- [x] Botões de ação secundários (menor destaque): `gap-1.5`
+- [x] Verificar alinhamento vertical de ícone + label em cada botão
+- [x] Garantir que botões não sobrepõem em viewport padrão (1280px)
 
 ## Arquivos alvo
 

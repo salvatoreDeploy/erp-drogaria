@@ -2,7 +2,7 @@
 id: CHANGE-WA-002
 task: TASK-WA-002
 prioridade: P2
-status: pending
+status: done
 modulo: whatsapp
 pagina: WhatsAppPage
 arquivos:
@@ -17,10 +17,10 @@ depende-de: []
 Lista de conversas no painel esquerdo não tem scroll — com mais de ~8 conversas, as demais ficam inacessíveis.
 
 ## O que implementar
-- [ ] Adicionar `overflow-y-auto` no container da lista de conversas
-- [ ] Garantir que o container tem `min-h-0` para que o flex pai propague altura
-- [ ] Scroll position mantida ao voltar para a lista após abrir conversa
-- [ ] Barra de scroll visível mas discreta (cor `#DCE7E1`)
+- [x] Adicionar `overflow-y-auto` no container da lista de conversas
+- [x] Garantir que o container tem `min-h-0` para que o flex pai propague altura
+- [x] Scroll position mantida ao voltar para a lista após abrir conversa
+- [x] Barra de scroll visível mas discreta (cor `#DCE7E1`)
 
 ## Arquivos alvo
 
@@ -36,4 +36,4 @@ Nenhum — mudança puramente de layout.
 - Layout chat (§ Padrão D): `overflow-hidden` no container externo
 
 ## Resultado
-*(preencher após implementação)*
+Adicionado `min-h-0` ao painel esquerdo (`w-[280px]`) para que a altura do flex-row pai se propague ao flex-col filho. O container da lista já possuía `overflow-y-auto flex-1`; com `min-h-0` no pai a lista agora scrolla corretamente quando há mais de ~8 conversas. Scrollbar discreta aplicada via `[&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-[#DCE7E1]`.

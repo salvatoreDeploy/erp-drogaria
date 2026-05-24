@@ -1022,7 +1022,7 @@ function AbaAtendimentos() {
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden rounded-[20px] border border-[#DCE7E1]">
       {/* Painel esquerdo: lista unificada */}
-      <div className="flex w-[280px] shrink-0 flex-col border-[#DCE7E1] border-r bg-white">
+      <div className="flex min-h-0 w-[280px] shrink-0 flex-col border-[#DCE7E1] border-r bg-white">
         <div className="border-[#DCE7E1] border-b px-4 py-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="font-bold text-[#163B32] text-[15px]">Atendimentos</p>
@@ -1059,7 +1059,7 @@ function AbaAtendimentos() {
           ))}
         </div>
 
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-1 flex-col overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DCE7E1] [&::-webkit-scrollbar]:w-1">
           {filtradas.map((c) => {
             const isActive = c.id === convSelecionada.id
             const scfg = CONV_STATUS_CFG[c.status]
@@ -1195,7 +1195,7 @@ function AbaAtendimentos() {
       <div className="flex w-[360px] shrink-0 flex-col border-[#DCE7E1] border-l bg-white">
         <ClienteHeader conv={convSelecionada} />
 
-        <div className="flex flex-wrap gap-1 border-[#DCE7E1] border-b px-4 py-3">
+        <div className="flex flex-wrap gap-1.5 border-[#DCE7E1] border-b px-4 py-3">
           {TABS_OPS.map((t) => (
             <button
               key={t.id}

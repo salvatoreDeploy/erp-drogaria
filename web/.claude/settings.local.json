@@ -20,7 +20,12 @@
       "Bash(claude *)",
       "Bash(dir D:\\\\projeto-erp *)",
       "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\" -Force)",
-      "Bash(Select-Object Name, PSIsContainer)"
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\\\\web\" -File)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\\\\web\\\\.claude\" -Force -Recurse)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Skill(apply-change)"
     ]
   }
 }
