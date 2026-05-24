@@ -255,8 +255,8 @@ grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)_100px_..._90px_130px]
 - `border-r` / `border-l` nos painéis (cor `#DCE7E1`) em vez de `gap` — painéis ficam colados
 - Chat background: `bg-[#F7FAF8]` (não `bg-white`)
 - Tokens de cor do chat: ver `.spec/whatsapp-atendimentos.spec.md`
-- Painel direito é sempre **360px** — o conteúdo interno muda por aba, não o painel
-- `ClienteHeader` fica fixo acima das abas — atendente nunca perde referência do cliente
+- Painel direito é sempre **360px** — scrollável, com 4 seções fixas (design Pencil `customerPanel`)
+- `ClienteHeader` ocupa **todo o painel direito**: custHeader (avatar 56px + nome + badges) · custDetails (Informações) · custActions (Ações rápidas) · recentPurchases (Compras recentes) — sem abas
 
 **Regra:** `min-h-0` em cada nível flex que precisa propagar altura para `overflow-y-auto` funcionar.
 

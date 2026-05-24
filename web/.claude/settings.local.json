@@ -25,7 +25,8 @@
       "Bash(Select-Object Name)",
       "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\\\\web\\\\.claude\" -Force -Recurse)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Skill(apply-change)"
+      "Skill(apply-change)",
+      "Bash(python3 *)"
     ]
   }
 }

@@ -1,22 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CampanhaWhatsApp, NovaCampanha, TemplateWhatsApp } from '../schemas'
 import { NovaCampanhaSchema } from '../schemas'
 
 /* ── Types ───────────────────────────────────────────────── */
 type Aba = 'hub' | 'atendimentos' | 'campanhas'
-type AbaOps = 'orcamento' | 'receita' | 'pedido' | 'historico'
 type FiltroStatus = 'todos' | ConvStatus
 
 /* ── Chat mock data ──────────────────────────────────────── */
 type ConvStatus = 'aguardando' | 'em_atendimento' | 'resolvido'
-type OrcamentoItem = {
-  produto_id: string
-  nome: string
-  laboratorio: string
-  apresentacao: string
-  preco: number
-  qty: number
-}
 type Conversa = {
   id: string
   nome: string
@@ -27,7 +18,6 @@ type Conversa = {
   avatarColor: string
   status: ConvStatus
   alertas?: string[]
-  orcamento?: OrcamentoItem[]
 }
 type Bubble = {
   id: string
@@ -223,13 +213,6 @@ const FILTRO_CFG: { id: FiltroStatus; label: string }[] = [
   { id: 'aguardando', label: 'Aguardando' },
   { id: 'em_atendimento', label: 'Atendendo' },
   { id: 'resolvido', label: 'Resolvidos' },
-]
-
-const TABS_OPS: { id: AbaOps; label: string }[] = [
-  { id: 'orcamento', label: 'Orçamento' },
-  { id: 'receita', label: 'Receita' },
-  { id: 'pedido', label: 'Pedido' },
-  { id: 'historico', label: 'Histórico' },
 ]
 
 const PRODUTOS_CATALOGO = [
@@ -670,301 +653,421 @@ function AbaHub() {
 
 /* ── AbaAtendimentos helpers ─────────────────────────────── */
 
-function ClienteHeader({ conv }: { conv: Conversa }) {
+const COMPRAS_RECENTES_MOCK = [
+  { produto: 'Losartana 50mg', data: '05/05/2026', preco: 'R$ 32,90' },
+  { produto: 'Vitamina D 1000UI', data: '28/04/2026', preco: 'R$ 18,50' },
+  { produto: 'Protetor Solar FPS 50', data: '15/04/2026', preco: 'R$ 54,90' },
+]
+
+const INFO_CLIENTE_MOCK = [
+  { label: 'CPF', value: '123.456.789-00', cls: 'font-medium text-[#173126] text-[12px]' },
+  {
+    label: 'E-mail',
+    value: 'maria.silva@email.com',
+    cls: 'font-medium text-[#173126] text-[12px]',
+  },
+  {
+    label: 'Última compra',
+    value: '09/05/2026 — R$ 87,60',
+    cls: 'font-medium text-[#173126] text-[12px]',
+  },
+  {
+    label: 'Pontos fidelidade',
+    value: '1.240 pontos',
+    cls: 'font-bold text-[#2D9D6E] text-[12px]',
+  },
+]
+
+function ClienteHeader({
+  conv,
+  onConsultarProduto,
+  onEnviarPromocao,
+}: {
+  conv: Conversa
+  onConsultarProduto: () => void
+  onEnviarPromocao: () => void
+}) {
   return (
-    <div className="flex flex-col items-center gap-2.5 border-[#DCE7E1] border-b px-5 py-4">
-      <AvatarCircle nome={conv.nome} color={conv.avatarColor} size={48} />
-      <div className="flex flex-col items-center gap-0.5">
-        <p className="font-bold text-[#163B32] text-[15px]">{conv.nome}</p>
-        <p className="text-[#8A9892] text-[12px]">{conv.telefone}</p>
+    <div className="flex flex-col">
+      {/* custHeader — avatar + name + badges */}
+      <div className="flex flex-col items-center gap-[14px] border-[#DCE7E1] border-b px-5 pt-6 pb-[18px]">
+        <AvatarCircle nome={conv.nome} color={conv.avatarColor} size={56} />
+        <div className="flex flex-col items-center gap-1">
+          <p className="font-bold text-[#163B32] text-[16px]">{conv.nome}</p>
+          <p className="text-[#7A8883] text-[12px]">{conv.telefone}</p>
+        </div>
+        <div className="flex flex-wrap justify-center gap-[6px]">
+          <span className="rounded-full bg-[#E1F5EE] px-[10px] py-1 font-semibold text-[#085041] text-[10px]">
+            Fidelidade Ouro
+          </span>
+          <span className="rounded-full bg-[#E1F5EE] px-[10px] py-1 font-semibold text-[#085041] text-[10px]">
+            Cliente ativo
+          </span>
+        </div>
       </div>
-      <div className="flex flex-wrap justify-center gap-1.5">
-        <span className="rounded-full bg-[#E1F5EE] px-2.5 py-0.5 font-medium text-[#085041] text-[10px]">
-          Cliente ativo
-        </span>
-        <span className="rounded-full bg-[#E1F5EE] px-2.5 py-0.5 font-medium text-[#085041] text-[10px]">
-          Fidelidade Ouro
-        </span>
+
+      {/* custDetails — Informações */}
+      <div className="flex flex-col gap-[14px] border-[#DCE7E1] border-b px-5 py-[18px]">
+        <p className="font-bold text-[#163B32] text-[13px]">Informações</p>
+        {/* TODO: integrar com API — GET /api/v1/cadastros/clientes/{cpf} */}
+        {INFO_CLIENTE_MOCK.map((row) => (
+          <div key={row.label} className="flex flex-col gap-[2px]">
+            <p className="font-semibold text-[#8A9892] text-[10px]">{row.label}</p>
+            <p className={row.cls}>{row.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* custActions — Ações rápidas */}
+      <div className="flex flex-col gap-[10px] border-[#DCE7E1] border-b px-5 py-[18px]">
+        <p className="font-bold text-[#163B32] text-[13px]">Ações rápidas</p>
+        <button
+          type="button"
+          onClick={onConsultarProduto}
+          className="flex w-full items-center justify-center rounded-[10px] bg-[#0E4D3B] px-[14px] py-[10px] font-semibold text-[12px] text-white transition-colors hover:bg-[#0a3a2c]"
+        >
+          Consultar produto
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center justify-center rounded-[10px] border border-[#DCE7E1] bg-white px-[14px] py-[10px] font-semibold text-[#173126] text-[12px] transition-colors hover:bg-[#F7FAF8]"
+        >
+          Verificar receita
+        </button>
+        <button
+          type="button"
+          onClick={onEnviarPromocao}
+          className="flex w-full items-center justify-center rounded-[10px] border border-[#DCE7E1] bg-white px-[14px] py-[10px] font-semibold text-[#173126] text-[12px] transition-colors hover:bg-[#F7FAF8]"
+        >
+          Enviar promoção
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center justify-center rounded-[10px] border border-[#DCE7E1] bg-white px-[14px] py-[10px] font-semibold text-[#173126] text-[12px] transition-colors hover:bg-[#F7FAF8]"
+        >
+          Registrar venda
+        </button>
+      </div>
+
+      {/* recentPurchases — Compras recentes */}
+      <div className="flex flex-col gap-[10px] px-5 py-[18px]">
+        <p className="font-bold text-[#163B32] text-[13px]">Compras recentes</p>
+        {/* TODO: integrar com API — GET /api/v1/whatsapp/conversas/{id}/compras-recentes */}
+        {COMPRAS_RECENTES_MOCK.map((c) => (
+          <div
+            key={c.produto}
+            className="flex items-center justify-between rounded-[8px] bg-[#F7FAF8] px-[10px] py-[8px]"
+          >
+            <div className="flex flex-col gap-[2px]">
+              <p className="text-[#173126] text-[12px]">{c.produto}</p>
+              <p className="text-[#8A9892] text-[10px]">{c.data}</p>
+            </div>
+            <p className="font-semibold text-[#173126] text-[12px]">{c.preco}</p>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-function ContentOrcamento({
-  orcamento,
-  onAddItem,
-  onSendChat,
-  onConvertPedido,
+/* ── Ações rápidas (modais) ──────────────────────────────── */
+const TEMPLATES_WA = [
+  {
+    id: 't1',
+    nome: 'Boas-vindas',
+    texto: 'Olá {{nome}}, bem-vindo à Farmácia! 😊 Como posso ajudá-lo hoje?',
+  },
+  {
+    id: 't2',
+    nome: 'Pedido pronto',
+    texto: 'Olá {{nome}}, seu pedido #{{numero}} está pronto para retirada!',
+  },
+  {
+    id: 't3',
+    nome: 'Lembrete receita',
+    texto:
+      'Olá {{nome}}, sua receita de {{medicamento}} está prestes a vencer. Renove com seu médico.',
+  },
+]
+
+function ModalBuscaProdutoChat({
+  onClose,
+  onEnviar,
 }: {
-  orcamento: OrcamentoItem[]
-  onAddItem: (item: OrcamentoItem) => void
-  onSendChat: () => void
-  onConvertPedido: () => void
+  onClose: () => void
+  onEnviar: (texto: string) => void
 }) {
   const [busca, setBusca] = useState('')
+  const [termo, setTermo] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => setTermo(busca), 300)
+    return () => clearTimeout(t)
+  }, [busca])
 
   const filtrados = useMemo(
     () =>
-      busca.length >= 2
+      termo.length >= 2
         ? PRODUTOS_CATALOGO.filter(
             (p) =>
-              p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-              p.laboratorio.toLowerCase().includes(busca.toLowerCase())
+              p.nome.toLowerCase().includes(termo.toLowerCase()) ||
+              p.laboratorio.toLowerCase().includes(termo.toLowerCase())
           )
         : [],
-    [busca]
+    [termo]
   )
 
   const fmtPreco = (v: number) =>
     `R$ ${(v / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-  const total = orcamento.reduce((sum, i) => sum + i.preco * i.qty, 0)
 
   return (
-    <>
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-        <p className="font-bold text-[#173126] text-[13px]">Buscar produto</p>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Nome ou laboratório (mín. 2 chars)..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="h-9 w-full rounded-[12px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
-          />
-          {filtrados.length > 0 && (
-            <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-[12px] border border-[#DCE7E1] bg-white shadow-lg">
-              {filtrados.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onMouseDown={() => {
-                    onAddItem({
-                      produto_id: p.id,
-                      nome: p.nome,
-                      laboratorio: p.laboratorio,
-                      apresentacao: p.apresentacao,
-                      preco: p.preco,
-                      qty: 1,
-                    })
-                    setBusca('')
-                  }}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-[#F7FAF8]"
-                >
-                  <div>
-                    <p className="font-medium text-[#173126] text-[12px]">{p.nome}</p>
-                    <p className="text-[#8A9892] text-[10px]">
-                      {p.laboratorio} · {p.apresentacao}
-                    </p>
-                  </div>
-                  <p className="font-semibold text-[#173126] text-[12px]">{fmtPreco(p.preco)}</p>
-                </button>
-              ))}
-            </div>
-          )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[400px] flex-col gap-4 rounded-[24px] bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-[#173126] text-[16px]">Consultar Produto</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F2F7F4] text-[#8A9892] text-[12px] hover:bg-[#DCE7E1]"
+          >
+            ✕
+          </button>
         </div>
-
-        {orcamento.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-center text-[#8A9892] text-[12px]">
-              Busque um produto acima para montar o orçamento
-            </p>
-          </div>
+        <input
+          type="text"
+          placeholder="Buscar por nome ou laboratório..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="h-9 w-full rounded-[12px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
+        />
+        {termo.length < 2 ? (
+          <p className="text-center text-[#8A9892] text-[12px]">Digite ao menos 2 caracteres</p>
+        ) : filtrados.length === 0 ? (
+          <p className="text-center text-[#8A9892] text-[12px]">Nenhum produto encontrado</p>
         ) : (
-          <>
-            <p className="font-bold text-[#173126] text-[12px]">Itens do orçamento</p>
-            {orcamento.map((item) => (
-              <div
-                key={item.produto_id}
-                className="flex items-center justify-between rounded-[14px] border border-[#E6ECE8] bg-[#F7FAF8] px-4 py-3"
+          // TODO: integrar com API — GET /api/v1/produtos/busca?q={termo}
+          <div className="flex max-h-52 flex-col overflow-y-auto">
+            {filtrados.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  onEnviar(
+                    `📦 *${p.nome}*\n${p.laboratorio} · ${p.apresentacao}\nPreço: ${fmtPreco(p.preco)}`
+                  )
+                  onClose()
+                }}
+                className="flex items-center justify-between rounded-[12px] px-3 py-2.5 text-left hover:bg-[#F7FAF8]"
               >
                 <div>
-                  <p className="font-semibold text-[#173126] text-[12px]">{item.nome}</p>
+                  <p className="font-medium text-[#173126] text-[12px]">{p.nome}</p>
                   <p className="text-[#8A9892] text-[10px]">
-                    {item.laboratorio} · {item.apresentacao}
+                    {p.laboratorio} · {p.apresentacao}
                   </p>
                 </div>
-                <p className="font-bold text-[#173126] text-[13px]">
-                  {fmtPreco(item.preco * item.qty)}
-                </p>
-              </div>
+                <div className="text-right">
+                  <p className="font-semibold text-[#173126] text-[12px]">{fmtPreco(p.preco)}</p>
+                  <p className="font-medium text-[#0E4D3B] text-[10px]">Enviar →</p>
+                </div>
+              </button>
             ))}
-            <div className="flex items-center justify-between rounded-[14px] border border-[#E6ECE8] bg-[#E1F5EE] px-4 py-3">
-              <p className="font-bold text-[#085041] text-[12px]">Total</p>
-              <p className="font-bold text-[#085041] text-[14px]">{fmtPreco(total)}</p>
-            </div>
-          </>
+          </div>
         )}
       </div>
-
-      {orcamento.length > 0 && (
-        <div className="flex flex-col gap-2 border-[#DCE7E1] border-t p-4">
-          <button
-            type="button"
-            onClick={onSendChat}
-            className="flex h-9 w-full items-center justify-center rounded-[12px] bg-[#0E4D3B] font-bold text-[12px] text-white hover:bg-[#0a3a2c]"
-          >
-            Enviar orçamento no chat
-          </button>
-          <button
-            type="button"
-            onClick={onConvertPedido}
-            className="flex h-9 w-full items-center justify-center rounded-[12px] border border-[#DCE7E1] font-medium text-[#173126] text-[12px] hover:bg-[#F7FAF8]"
-          >
-            Converter em pedido →
-          </button>
-        </div>
-      )}
-    </>
+    </div>
   )
 }
 
-function ContentReceita({ conv }: { conv: Conversa }) {
-  const temReceita = conv.id === 'cv1'
+function ModalConsultarPedido({
+  onClose,
+  onEnviar,
+}: {
+  onClose: () => void
+  onEnviar: (texto: string) => void
+}) {
+  const [termo, setTermo] = useState('')
+  const [consultando, setConsultando] = useState(false)
 
-  if (!temReceita) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 py-4">
-        <p className="text-center text-[#8A9892] text-[12px]">
-          Nenhuma receita digital vinculada a esta conversa
-        </p>
-        <button
-          type="button"
-          className="flex h-8 items-center rounded-[10px] border border-[#DCE7E1] bg-white px-3 font-medium text-[#173126] text-[11px] hover:bg-[#F7FAF8]"
-        >
-          Validar receita recebida no chat
-        </button>
-      </div>
-    )
+  const handleConsultar = async () => {
+    if (!termo.trim()) return
+    setConsultando(true)
+    try {
+      // TODO: integrar com API — GET /api/v1/vendas?cpf={cpf}&numero={numero}
+      await new Promise((r) => setTimeout(r, 600))
+      onEnviar(
+        `📋 *Pedido #${termo.includes('-') ? termo : `PED-${termo}`}*\nStatus: Em separação\nPrev. retirada: hoje, até 17h\nItens: 3 produtos`
+      )
+      onClose()
+    } catch (err) {
+      console.error('[handleConsultar]', err)
+    } finally {
+      setConsultando(false)
+    }
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-      <div className="flex items-center justify-between">
-        <p className="font-bold text-[#173126] text-[13px]">Receita Digital</p>
-        <span className="rounded-full bg-[#FAEEDA] px-2.5 py-0.5 font-semibold text-[#633806] text-[10px]">
-          ⚠ Pendente
-        </span>
-      </div>
-      {[
-        { label: 'Prescritor', value: 'Dr. Rafael Souza' },
-        { label: 'CRM', value: 'CRM/SP 54.321' },
-        { label: 'Data prescrição', value: '10/05/2025' },
-        { label: 'Validade', value: '12/06/2025' },
-        { label: 'Protocolo', value: 'RD-2025-08741' },
-        { label: 'Medicamento', value: 'Amoxicilina 500mg · 21 cáps' },
-      ].map((f) => (
-        <div
-          key={f.label}
-          className="flex flex-col gap-0.5 rounded-[14px] border border-[#E6ECE8] bg-[#F7FAF8] px-4 py-3"
-        >
-          <p className="font-bold text-[#8A9892] text-[10px] uppercase">{f.label}</p>
-          <p className="font-medium text-[#173126] text-[13px]">{f.value}</p>
-        </div>
-      ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
         type="button"
-        // TODO: POST /api/v1/whatsapp/conversas/{id}/receita/validar
-        className="mt-2 flex h-9 w-full items-center justify-center rounded-[12px] bg-[#0E4D3B] font-bold text-[12px] text-white hover:bg-[#0a3a2c]"
-      >
-        Confirmar e validar receita
-      </button>
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[360px] flex-col gap-4 rounded-[24px] bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-[#173126] text-[16px]">Consultar Pedido</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F2F7F4] text-[#8A9892] text-[12px] hover:bg-[#DCE7E1]"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="pedido-termo" className="font-bold text-[#8A9892] text-[12px]">
+            CPF do cliente ou número do pedido
+          </label>
+          <input
+            id="pedido-termo"
+            type="text"
+            placeholder="000.000.000-00 ou PED-2026-001"
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            className="h-9 w-full rounded-[12px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleConsultar}
+          disabled={!termo.trim() || consultando}
+          className={[
+            'flex h-10 w-full items-center justify-center rounded-[14px] font-bold text-[13px] transition-colors',
+            !termo.trim() || consultando
+              ? 'cursor-not-allowed bg-brand-300 text-white opacity-60'
+              : 'bg-[#0E4D3B] text-white hover:bg-[#0a3a2c]',
+          ].join(' ')}
+        >
+          {consultando ? 'Consultando...' : 'Consultar'}
+        </button>
+      </div>
     </div>
   )
 }
 
-function ContentPedido({
-  orcamento,
-  onSeparar,
+function ModalEnviarTemplate({
+  onClose,
+  onEnviar,
 }: {
-  orcamento: OrcamentoItem[]
-  onSeparar: () => void
+  onClose: () => void
+  onEnviar: (texto: string) => void
 }) {
-  const fmtPreco = (v: number) =>
-    `R$ ${(v / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-  const itens =
-    orcamento.length > 0
-      ? orcamento
-      : [
-          {
-            produto_id: 'p1',
-            nome: 'Amoxicilina 500mg',
-            laboratorio: 'EMS',
-            apresentacao: '21 cáps',
-            preco: 2490,
-            qty: 1,
-          },
-        ]
-  const total = itens.reduce((sum, i) => sum + i.preco * i.qty, 0)
+  const [templateId, setTemplateId] = useState('')
+  const [variaveis, setVariaveis] = useState<Record<string, string>>({})
+
+  const tpl = TEMPLATES_WA.find((t) => t.id === templateId) ?? null
+  const vars = tpl ? [...tpl.texto.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]) : []
+  const preview = tpl
+    ? vars.reduce((txt, v) => txt.replace(`{{${v}}}`, variaveis[v] ?? `{{${v}}}`), tpl.texto)
+    : ''
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-      <p className="font-bold text-[#173126] text-[13px]">Resumo do pedido</p>
-      {itens.map((item) => (
-        <div
-          key={item.produto_id}
-          className="flex items-center justify-between rounded-[14px] border border-[#E6ECE8] bg-[#F7FAF8] px-4 py-3"
-        >
-          <div>
-            <p className="font-semibold text-[#173126] text-[13px]">{item.nome}</p>
-            <p className="text-[#8A9892] text-[11px]">
-              {item.apresentacao} · {item.laboratorio}
-            </p>
-          </div>
-          <p className="font-bold text-[#173126] text-[14px]">{fmtPreco(item.preco * item.qty)}</p>
-        </div>
-      ))}
-      <div className="flex items-center justify-between rounded-[14px] border border-[#E6ECE8] bg-[#E1F5EE] px-4 py-3">
-        <p className="font-bold text-[#085041] text-[13px]">Total</p>
-        <p className="font-bold text-[#085041] text-[16px]">{fmtPreco(total)}</p>
-      </div>
-      <p className="text-center text-[#8A9892] text-[11px]">
-        +{Math.floor(total / 500)} pontos fidelidade
-      </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       <button
         type="button"
-        onClick={onSeparar}
-        // TODO: POST /api/v1/whatsapp/conversas/{id}/pedido/separar
-        className="mt-auto flex h-10 w-full items-center justify-center rounded-[12px] bg-[#0E4D3B] font-bold text-[13px] text-white hover:bg-[#0a3a2c]"
-      >
-        Separar pedido e notificar cliente
-      </button>
-    </div>
-  )
-}
-
-function ContentHistorico() {
-  const historico = [
-    { data: '08/05/2025', tipo: 'Compra', desc: 'Amoxicilina 500mg · 21 cáps', valor: 'R$ 24,90' },
-    { data: '22/04/2025', tipo: 'Receita', desc: 'RD-2025-07312 · Dr. Ana Lima', valor: '—' },
-    { data: '10/04/2025', tipo: 'Compra', desc: 'Omeprazol 20mg + Buscopan', valor: 'R$ 42,80' },
-    {
-      data: '01/03/2025',
-      tipo: 'PBM',
-      desc: 'Metformina 850mg · Farmácia Popular',
-      valor: 'R$ 0,00',
-    },
-  ]
-  return (
-    <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 py-4">
-      <p className="font-bold text-[#173126] text-[13px]">Histórico do cliente</p>
-      {/* TODO: GET /api/v1/whatsapp/conversas/{id}/historico */}
-      {historico.map((h) => (
-        <div
-          key={`${h.data}-${h.tipo}`}
-          className="flex items-start gap-3 rounded-[14px] border border-[#E6ECE8] bg-[#F7FAF8] px-4 py-3"
-        >
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-brand-75 px-2 py-0.5 font-medium text-[9px] text-brand-750">
-                {h.tipo}
-              </span>
-              <p className="text-[#8A9892] text-[10px]">{h.data}</p>
-            </div>
-            <p className="mt-1 text-[#173126] text-[12px]">{h.desc}</p>
-          </div>
-          <p className="font-semibold text-[#173126] text-[12px]">{h.valor}</p>
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[400px] flex-col gap-4 rounded-[24px] bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <p className="font-bold text-[#173126] text-[16px]">Enviar Template</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F2F7F4] text-[#8A9892] text-[12px] hover:bg-[#DCE7E1]"
+          >
+            ✕
+          </button>
         </div>
-      ))}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="sel-template" className="font-bold text-[#8A9892] text-[12px]">
+            Template
+          </label>
+          {/* TODO: integrar com API — GET /api/v1/whatsapp/templates */}
+          <select
+            id="sel-template"
+            value={templateId}
+            onChange={(e) => {
+              setTemplateId(e.target.value)
+              setVariaveis({})
+            }}
+            className="h-9 w-full rounded-[12px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none"
+          >
+            <option value="">Selecione um template...</option>
+            {TEMPLATES_WA.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+        {vars.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {vars.map((v) => (
+              <div key={v} className="flex flex-col gap-1.5">
+                <label
+                  htmlFor={`var-${v}`}
+                  className="font-bold text-[#8A9892] text-[12px] capitalize"
+                >
+                  {v}
+                </label>
+                <input
+                  id={`var-${v}`}
+                  type="text"
+                  placeholder={`Valor para {{${v}}}`}
+                  value={variaveis[v] ?? ''}
+                  onChange={(e) => setVariaveis((prev) => ({ ...prev, [v]: e.target.value }))}
+                  className="h-8 rounded-[10px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {preview && (
+          <div className="rounded-[14px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 py-2.5">
+            <p className="mb-1 font-bold text-[#8A9892] text-[10px]">PREVIEW</p>
+            <p className="whitespace-pre-line text-[#173126] text-[12px]">{preview}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={!tpl}
+          onClick={() => {
+            if (preview) {
+              onEnviar(preview)
+              onClose()
+            }
+          }}
+          className={[
+            'flex h-10 w-full items-center justify-center rounded-[14px] font-bold text-[13px] transition-colors',
+            !tpl
+              ? 'cursor-not-allowed bg-brand-300 text-white opacity-60'
+              : 'bg-[#0E4D3B] text-white hover:bg-[#0a3a2c]',
+          ].join(' ')}
+        >
+          Enviar template
+        </button>
+      </div>
     </div>
   )
 }
@@ -974,8 +1077,17 @@ function AbaAtendimentos() {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<FiltroStatus>('todos')
   const [mensagem, setMensagem] = useState('')
-  const [abaOps, setAbaOps] = useState<AbaOps>('orcamento')
-  const [orcamento, setOrcamento] = useState<OrcamentoItem[]>([])
+  const [bubblesExtra, setBubblesExtra] = useState<Bubble[]>([])
+  const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null)
+  const [modalProdutoChat, setModalProdutoChat] = useState(false)
+  const [consultarPedidoOpen, setConsultarPedidoOpen] = useState(false)
+  const [enviarTemplateOpen, setEnviarTemplateOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [showTopFade, setShowTopFade] = useState(false)
+  const [showBottomFade, setShowBottomFade] = useState(false)
 
   const filtradas = useMemo(
     () =>
@@ -988,8 +1100,27 @@ function AbaAtendimentos() {
     [busca, filtro]
   )
 
-  const bubbles =
-    convSelecionada.id === 'cv1' ? CHAT_ANA_ATEND : convSelecionada.id === 'cv4' ? CHAT_MARIA : []
+  const bubbles = [
+    ...(convSelecionada.id === 'cv1'
+      ? CHAT_ANA_ATEND
+      : convSelecionada.id === 'cv4'
+        ? CHAT_MARIA
+        : []),
+    ...bubblesExtra,
+  ]
+
+  function addBubble(texto: string) {
+    setBubblesExtra((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        tipo: 'enviada' as const,
+        texto,
+        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        lido: false,
+      },
+    ])
+  }
 
   const counters = useMemo(
     () => ({
@@ -999,240 +1130,348 @@ function AbaAtendimentos() {
     []
   )
 
-  function handleAddOrcamentoItem(item: OrcamentoItem) {
-    setOrcamento((prev) => {
-      const idx = prev.findIndex((i) => i.produto_id === item.produto_id)
-      if (idx >= 0) {
-        const updated = [...prev]
-        updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 }
-        return updated
-      }
-      return [...prev, item]
-    })
+  function handleSelecionarArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setErroArquivo(null)
+    const TIPOS = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]
+    if (!TIPOS.includes(file.type)) {
+      setErroArquivo('Tipo não suportado. Use JPG, PNG, WEBP, PDF ou DOCX.')
+      return
+    }
+    if (file.size > 16 * 1024 * 1024) {
+      setErroArquivo('Arquivo muito grande. Limite: 16 MB.')
+      return
+    }
+    setArquivoSelecionado(file)
+    e.target.value = ''
   }
 
-  function handleSendOrcamento() {
-    // TODO: POST /api/v1/whatsapp/conversas/{id}/orcamento/enviar
+  const handleAnexarArquivo = async () => {
+    if (!arquivoSelecionado) return
+    setUploadProgress(0)
+    try {
+      // TODO: integrar com API — POST /api/v1/whatsapp/upload-midia
+      await new Promise<void>((resolve) => {
+        let p = 0
+        const iv = setInterval(() => {
+          p += 25
+          setUploadProgress(p)
+          if (p >= 100) {
+            clearInterval(iv)
+            resolve()
+          }
+        }, 150)
+      })
+      // TODO: integrar com API — POST /api/v1/whatsapp/conversas/{id}/send (com media_id)
+      setArquivoSelecionado(null)
+      setMensagem('')
+    } catch (err) {
+      console.error('[handleAnexarArquivo]', err)
+      setErroArquivo('Falha no envio. Tente novamente.')
+    } finally {
+      setUploadProgress(null)
+    }
   }
 
-  function handleSepararPedido() {
-    // TODO: POST /api/v1/whatsapp/conversas/{id}/pedido/separar
-  }
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    const check = () => {
+      setShowTopFade(el.scrollTop > 4)
+      setShowBottomFade(
+        filtradas.length > 0 && el.scrollTop + el.clientHeight < el.scrollHeight - 4
+      )
+    }
+    const raf = requestAnimationFrame(check)
+    el.addEventListener('scroll', check, { passive: true })
+    return () => {
+      cancelAnimationFrame(raf)
+      el.removeEventListener('scroll', check)
+    }
+  }, [filtradas])
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-[20px] border border-[#DCE7E1]">
-      {/* Painel esquerdo: lista unificada */}
-      <div className="flex min-h-0 w-[280px] shrink-0 flex-col border-[#DCE7E1] border-r bg-white">
-        <div className="border-[#DCE7E1] border-b px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-bold text-[#163B32] text-[15px]">Atendimentos</p>
-            {counters.aguardando > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#D97706] px-1 font-bold text-[9px] text-white">
-                {counters.aguardando}
-              </span>
-            )}
+    <>
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-[20px] border border-[#DCE7E1]">
+        {/* Painel esquerdo: lista unificada */}
+        <div className="flex min-h-0 w-[280px] shrink-0 flex-col overflow-hidden border-[#DCE7E1] border-r bg-white">
+          <div className="border-[#DCE7E1] border-b px-4 py-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-bold text-[#163B32] text-[15px]">Atendimentos</p>
+              {counters.aguardando > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#D97706] px-1 font-bold text-[9px] text-white">
+                  {counters.aguardando}
+                </span>
+              )}
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="h-8 w-full rounded-[10px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Buscar..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="h-8 w-full rounded-[10px] border border-[#DCE7E1] bg-[#F7FAF8] px-3 text-[#173126] text-[12px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
-          />
-        </div>
 
-        <div className="flex flex-wrap gap-1 border-[#DCE7E1] border-b px-3 py-2">
-          {FILTRO_CFG.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFiltro(f.id)}
-              className={[
-                'flex h-6 items-center rounded-full px-2.5 font-medium text-[10px] transition-colors',
-                filtro === f.id
-                  ? 'bg-[#0E4D3B] text-white'
-                  : 'border border-[#DCE7E1] bg-[#F2F7F4] text-[#8A9892]',
-              ].join(' ')}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-1 flex-col overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DCE7E1] [&::-webkit-scrollbar]:w-1">
-          {filtradas.map((c) => {
-            const isActive = c.id === convSelecionada.id
-            const scfg = CONV_STATUS_CFG[c.status]
-            return (
+          <div className="flex flex-wrap gap-1 border-[#DCE7E1] border-b px-3 py-2">
+            {FILTRO_CFG.map((f) => (
               <button
-                key={c.id}
+                key={f.id}
                 type="button"
-                onClick={() => setConvSelecionada(c)}
+                onClick={() => setFiltro(f.id)}
                 className={[
-                  'flex w-full items-start gap-3 border-[#F0F4F2] border-b px-4 py-3 text-left transition-colors',
-                  isActive ? 'bg-[#E8F5EF]' : 'hover:bg-[#F7FAF8]',
+                  'flex h-6 items-center rounded-full px-2.5 font-medium text-[10px] transition-colors',
+                  filtro === f.id
+                    ? 'bg-[#0E4D3B] text-white'
+                    : 'border border-[#DCE7E1] bg-[#F2F7F4] text-[#8A9892]',
                 ].join(' ')}
               >
-                <div className="relative shrink-0">
-                  <AvatarCircle nome={c.nome} color={c.avatarColor} size={36} />
-                  {c.alertas && c.alertas.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#D97706] ring-2 ring-white" />
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative grow overflow-hidden">
+            <div
+              className={[
+                'pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-white to-transparent transition-opacity duration-200',
+                showTopFade ? 'opacity-100' : 'opacity-0',
+              ].join(' ')}
+            />
+            <div
+              className={[
+                'pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-white to-transparent transition-opacity duration-200',
+                showBottomFade ? 'opacity-100' : 'opacity-0',
+              ].join(' ')}
+            />
+            <div
+              ref={listRef}
+              className="h-full overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DCE7E1] [&::-webkit-scrollbar]:w-1.5"
+            >
+              {filtradas.map((c) => {
+                const isActive = c.id === convSelecionada.id
+                const scfg = CONV_STATUS_CFG[c.status]
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setConvSelecionada(c)}
+                    className={[
+                      'flex w-full items-start gap-3 border-[#F0F4F2] border-b px-4 py-3 text-left transition-colors',
+                      isActive ? 'bg-[#E8F5EF]' : 'hover:bg-[#F7FAF8]',
+                    ].join(' ')}
+                  >
+                    <div className="relative shrink-0">
+                      <AvatarCircle nome={c.nome} color={c.avatarColor} size={36} />
+                      {c.alertas && c.alertas.length > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#D97706] ring-2 ring-white" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="truncate font-semibold text-[#173126] text-[12px]">
+                          {c.nome}
+                        </p>
+                        <p className="shrink-0 text-[#8A9892] text-[10px]">{c.hora}</p>
+                      </div>
+                      <p className="mt-0.5 truncate text-[#8A9892] text-[11px]">{c.preview}</p>
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 font-medium text-[9px] ${scfg.bg} ${scfg.text}`}
+                        >
+                          {scfg.label}
+                        </span>
+                        {c.unread > 0 && (
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0E4D3B] px-1 font-bold text-[9px] text-white">
+                            {c.unread}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="border-[#DCE7E1] border-t bg-[#F7FAF8] px-4 py-2.5">
+            <p className="text-[#8A9892] text-[10px]">
+              {counters.em_atendimento} atendendo · {counters.aguardando} aguardando
+            </p>
+          </div>
+        </div>
+
+        {/* Painel central: chat */}
+        <div className="flex min-h-0 flex-1 flex-col bg-[#F7FAF8]">
+          <div className="flex items-center gap-3 border-[#DCE7E1] border-b bg-white px-5 py-3.5">
+            <AvatarCircle
+              nome={convSelecionada.nome}
+              color={convSelecionada.avatarColor}
+              size={40}
+            />
+            <div className="flex-1">
+              <p className="font-semibold text-[#173126] text-[14px]">{convSelecionada.nome}</p>
+              <p className="text-[#8A9892] text-[11px]">{convSelecionada.telefone}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {convSelecionada.alertas?.map((a) => (
+                <span
+                  key={a}
+                  className="rounded-full bg-[#FAEEDA] px-2.5 py-1 font-semibold text-[#633806] text-[10px]"
+                >
+                  ⚠ {a}
+                </span>
+              ))}
+              {convSelecionada.status === 'aguardando' ? (
+                <button
+                  type="button"
+                  // TODO: POST /api/v1/whatsapp/conversas/{id}/iniciar
+                  className="flex h-8 items-center rounded-[10px] bg-[#0E4D3B] px-3 font-medium text-[11px] text-white hover:bg-[#0a3a2c]"
+                >
+                  Iniciar atendimento
+                </button>
+              ) : convSelecionada.status === 'em_atendimento' ? (
+                <>
+                  <button
+                    type="button"
+                    className="flex h-8 items-center rounded-[10px] border border-[#DCE7E1] bg-white px-3 font-medium text-[#173126] text-[11px] hover:bg-[#F7FAF8]"
+                  >
+                    Transferir
+                  </button>
+                  <button
+                    type="button"
+                    // TODO: POST /api/v1/whatsapp/conversas/{id}/encerrar
+                    className="flex h-8 items-center rounded-[10px] border border-[#DCE7E1] bg-white px-3 font-medium text-[11px] text-danger-600 hover:bg-danger-50"
+                  >
+                    Encerrar
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
+            {bubbles.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center">
+                <p className="text-[#8A9892] text-[13px]">Nenhuma mensagem ainda</p>
+              </div>
+            ) : (
+              bubbles.map((b) => <BubbleMsg key={b.id} b={b} />)
+            )}
+          </div>
+
+          {/* Preview de arquivo + erro */}
+          {(arquivoSelecionado || erroArquivo) && (
+            <div className="flex flex-col gap-1 border-[#DCE7E1] border-t bg-white px-4 py-2">
+              {arquivoSelecionado && (
+                <div className="flex items-center gap-2 rounded-[12px] border border-[#DCE7E1] bg-[#F2F7F4] px-3 py-2">
+                  <span className="text-[18px]">
+                    {arquivoSelecionado.type.startsWith('image/') ? '🖼️' : '📄'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-[11px] text-brand-700">
+                      {arquivoSelecionado.name}
+                    </p>
+                    <p className="text-[9px] text-text-secondary">
+                      {(arquivoSelecionado.size / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
+                  {uploadProgress !== null ? (
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-brand-100">
+                      <div
+                        className="h-full rounded-full bg-[#0E4D3B] transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setArquivoSelecionado(null)
+                        setErroArquivo(null)
+                      }}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#DCE7E1] text-[#8A9892] text-[10px] hover:bg-[#B8CFC8]"
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <p className="truncate font-semibold text-[#173126] text-[12px]">{c.nome}</p>
-                    <p className="shrink-0 text-[#8A9892] text-[10px]">{c.hora}</p>
-                  </div>
-                  <p className="mt-0.5 truncate text-[#8A9892] text-[11px]">{c.preview}</p>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 font-medium text-[9px] ${scfg.bg} ${scfg.text}`}
-                    >
-                      {scfg.label}
-                    </span>
-                    {c.unread > 0 && (
-                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0E4D3B] px-1 font-bold text-[9px] text-white">
-                        {c.unread}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="border-[#DCE7E1] border-t bg-[#F7FAF8] px-4 py-2.5">
-          <p className="text-[#8A9892] text-[10px]">
-            {counters.em_atendimento} atendendo · {counters.aguardando} aguardando
-          </p>
-        </div>
-      </div>
-
-      {/* Painel central: chat */}
-      <div className="flex min-h-0 flex-1 flex-col bg-[#F7FAF8]">
-        <div className="flex items-center gap-3 border-[#DCE7E1] border-b bg-white px-5 py-3.5">
-          <AvatarCircle nome={convSelecionada.nome} color={convSelecionada.avatarColor} size={40} />
-          <div className="flex-1">
-            <p className="font-semibold text-[#173126] text-[14px]">{convSelecionada.nome}</p>
-            <p className="text-[#8A9892] text-[11px]">{convSelecionada.telefone}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {convSelecionada.alertas?.map((a) => (
-              <span
-                key={a}
-                className="rounded-full bg-[#FAEEDA] px-2.5 py-1 font-semibold text-[#633806] text-[10px]"
-              >
-                ⚠ {a}
-              </span>
-            ))}
-            {convSelecionada.status === 'aguardando' ? (
-              <button
-                type="button"
-                // TODO: POST /api/v1/whatsapp/conversas/{id}/iniciar
-                className="flex h-8 items-center rounded-[10px] bg-[#0E4D3B] px-3 font-medium text-[11px] text-white hover:bg-[#0a3a2c]"
-              >
-                Iniciar atendimento
-              </button>
-            ) : convSelecionada.status === 'em_atendimento' ? (
-              <>
-                <button
-                  type="button"
-                  className="flex h-8 items-center rounded-[10px] border border-[#DCE7E1] bg-white px-3 font-medium text-[#173126] text-[11px] hover:bg-[#F7FAF8]"
-                >
-                  Transferir
-                </button>
-                <button
-                  type="button"
-                  // TODO: POST /api/v1/whatsapp/conversas/{id}/encerrar
-                  className="flex h-8 items-center rounded-[10px] border border-[#DCE7E1] bg-white px-3 font-medium text-[11px] text-danger-600 hover:bg-danger-50"
-                >
-                  Encerrar
-                </button>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
-          {bubbles.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center">
-              <p className="text-[#8A9892] text-[13px]">Nenhuma mensagem ainda</p>
+              )}
+              {erroArquivo && <p className="text-[11px] text-danger-600">{erroArquivo}</p>}
             </div>
-          ) : (
-            bubbles.map((b) => <BubbleMsg key={b.id} b={b} />)
           )}
-        </div>
 
-        <div className="flex items-center gap-2 border-[#DCE7E1] border-t bg-white px-4 py-3">
-          <button
-            type="button"
-            aria-label="Anexar arquivo"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#DCE7E1] bg-[#F7FAF8] text-[#7A8883] hover:bg-[#EEF4EF]"
-          >
-            📎
-          </button>
-          <input
-            type="text"
-            placeholder="Digite uma mensagem..."
-            value={mensagem}
-            onChange={(e) => setMensagem(e.target.value)}
-            className="h-10 flex-1 rounded-[14px] border border-[#DCE7E1] bg-[#F7FAF8] px-4 text-[#173126] text-[13px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
-          />
-          <button
-            type="button"
-            aria-label="Enviar mensagem"
-            // TODO: POST /api/v1/whatsapp/conversas/{id}/send
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#0E4D3B] text-[18px] hover:bg-[#0a3a2c]"
-          >
-            ➤
-          </button>
-        </div>
-      </div>
-
-      {/* Painel direito: cliente fixo + tabs de ação */}
-      <div className="flex w-[360px] shrink-0 flex-col border-[#DCE7E1] border-l bg-white">
-        <ClienteHeader conv={convSelecionada} />
-
-        <div className="flex flex-wrap gap-1.5 border-[#DCE7E1] border-b px-4 py-3">
-          {TABS_OPS.map((t) => (
+          {/* Inputbar */}
+          <div className="relative flex items-center gap-2 border-[#DCE7E1] border-t bg-white px-4 py-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.pdf,.docx"
+              className="sr-only"
+              onChange={handleSelecionarArquivo}
+            />
             <button
-              key={t.id}
               type="button"
-              onClick={() => setAbaOps(t.id)}
+              aria-label="Anexar arquivo"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[#DCE7E1] bg-[#F7FAF8] text-[#7A8883] hover:bg-[#EEF4EF]"
+            >
+              📎
+            </button>
+            <input
+              type="text"
+              placeholder="Digite uma mensagem..."
+              value={mensagem}
+              onChange={(e) => setMensagem(e.target.value)}
+              className="h-10 flex-1 rounded-[14px] border border-[#DCE7E1] bg-[#F7FAF8] px-4 text-[#173126] text-[13px] outline-none placeholder:text-[#8A9892] focus:border-[#0E4D3B]"
+            />
+            <button
+              type="button"
+              aria-label="Enviar mensagem"
+              disabled={uploadProgress !== null}
+              onClick={arquivoSelecionado ? handleAnexarArquivo : undefined}
+              // TODO: integrar com API — POST /api/v1/whatsapp/conversas/{id}/send
               className={[
-                'flex h-7 items-center gap-1 rounded-full px-3 font-medium text-[11px] transition-colors',
-                abaOps === t.id
-                  ? 'bg-[#0E4D3B] text-white'
-                  : 'border border-[#DCE7E1] bg-[#F2F7F4] text-[#8A9892] hover:bg-[#E8F5EF]',
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-[18px] transition-colors',
+                uploadProgress !== null
+                  ? 'cursor-not-allowed bg-[#0E4D3B]/50'
+                  : 'bg-[#0E4D3B] hover:bg-[#0a3a2c]',
               ].join(' ')}
             >
-              {t.label}
-              {t.id === 'receita' && convSelecionada.alertas?.length ? (
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D97706]" />
-              ) : null}
+              ➤
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col">
-          {abaOps === 'orcamento' && (
-            <ContentOrcamento
-              orcamento={orcamento}
-              onAddItem={handleAddOrcamentoItem}
-              onSendChat={handleSendOrcamento}
-              onConvertPedido={() => setAbaOps('pedido')}
+        {/* Painel direito: painel do cliente (Pencil: customerPanel) */}
+        <div className="flex w-[360px] shrink-0 flex-col overflow-hidden border-[#DCE7E1] border-l bg-white">
+          <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DCE7E1] [&::-webkit-scrollbar]:w-1.5">
+            <ClienteHeader
+              conv={convSelecionada}
+              onConsultarProduto={() => setModalProdutoChat(true)}
+              onEnviarPromocao={() => setEnviarTemplateOpen(true)}
             />
-          )}
-          {abaOps === 'receita' && <ContentReceita conv={convSelecionada} />}
-          {abaOps === 'pedido' && (
-            <ContentPedido orcamento={orcamento} onSeparar={handleSepararPedido} />
-          )}
-          {abaOps === 'historico' && <ContentHistorico />}
+          </div>
         </div>
       </div>
-    </div>
+
+      {modalProdutoChat && (
+        <ModalBuscaProdutoChat onClose={() => setModalProdutoChat(false)} onEnviar={addBubble} />
+      )}
+      {consultarPedidoOpen && (
+        <ModalConsultarPedido onClose={() => setConsultarPedidoOpen(false)} onEnviar={addBubble} />
+      )}
+      {enviarTemplateOpen && (
+        <ModalEnviarTemplate onClose={() => setEnviarTemplateOpen(false)} onEnviar={addBubble} />
+      )}
+    </>
   )
 }
 

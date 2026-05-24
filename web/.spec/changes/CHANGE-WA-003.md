@@ -2,7 +2,7 @@
 id: CHANGE-WA-003
 task: TASK-WA-003
 prioridade: P2
-status: pending
+status: done
 modulo: whatsapp
 pagina: WhatsAppPage
 arquivos:
@@ -17,13 +17,13 @@ depende-de: []
 Botão 📎 na inputbar do chat não tem handler — atendentes não conseguem enviar orçamentos em PDF, fotos de produtos ou documentos.
 
 ## O que implementar
-- [ ] File picker: JPG/PNG/WEBP, PDF, DOCX — limite 16MB (restrição WhatsApp Business API)
-- [ ] Preview inline na inputbar antes de enviar: miniatura imagem ou ícone PDF + nome
-- [ ] Botão "Remover" no preview
-- [ ] Envio: arquivo + mensagem texto opcional (não obrigatório)
-- [ ] Estado de progresso: barra ou spinner durante upload
-- [ ] Tratamento de erro: arquivo muito grande, tipo não suportado, falha de envio
-- [ ] Bolha na conversa: `BubbleMsg` com `arquivo: { nome, tamanho }` (padrão já existe no CLAUDE.md)
+- [x] File picker: JPG/PNG/WEBP, PDF, DOCX — limite 16MB (restrição WhatsApp Business API)
+- [x] Preview inline na inputbar antes de enviar: miniatura imagem ou ícone PDF + nome
+- [x] Botão "Remover" no preview
+- [x] Envio: arquivo + mensagem texto opcional (não obrigatório)
+- [x] Estado de progresso: barra ou spinner durante upload
+- [x] Tratamento de erro: arquivo muito grande, tipo não suportado, falha de envio
+- [x] Bolha na conversa: `BubbleMsg` com `arquivo: { nome, tamanho }` (padrão já existe no CLAUDE.md)
 
 ## Arquivos alvo
 
@@ -42,4 +42,4 @@ Botão 📎 na inputbar do chat não tem handler — atendentes não conseguem e
 - Padrão importação (§6): feedback de progresso para arquivos grandes
 
 ## Resultado
-*(preencher após implementação)*
+`fileInputRef` (`useRef<HTMLInputElement>`) oculto com `sr-only`. Botão 📎 dispara `.click()` no ref. `handleSelecionarArquivo` valida tipo (JPG/PNG/WEBP/PDF/DOCX) e tamanho (16 MB) com erro inline. Preview mostra ícone 🖼️/📄 + nome truncado + tamanho KB + botão ✕. `handleAnexarArquivo` async simula progress bar 0→100% via `setInterval(150ms)`. Estado: `arquivoSelecionado: File | null` + `uploadProgress: number | null` + `erroArquivo: string | null`. Estado `bubblesExtra` adicionado para suportar bubbles dinâmicas no chat.

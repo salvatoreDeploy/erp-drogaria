@@ -42,25 +42,27 @@ resolvido     = pedido separado ou atendimento encerrado
 │ rounded-[20px] border-[#DCE7E1] overflow-hidden — flex-1 min-h-0              │
 │                                                                                │
 │  ┌──────────────────┐  ┌────────────────────────────┐  ┌──────────────────┐   │
-│  │ Lista unificada  │  │ Chat (central)             │  │ Painel de Ação   │   │
+│  │ Lista unificada  │  │ Chat (central)             │  │ Painel cliente   │   │
 │  │ w=280px          │  │ flex-1                     │  │ w=360px          │   │
 │  │ bg=#FFFFFF       │  │ bg=#F7FAF8                 │  │ bg=#FFFFFF       │   │
-│  │ rounded-l-[20px] │  │                            │  │ rounded-r-[20px] │   │
+│  │ rounded-l-[20px] │  │                            │  │ overflow-y-auto  │   │
 │  │                  │  │ Header: avatar + nome +    │  │                  │   │
 │  │ [Busca h=36]     │  │   badge estado + ações     │  │ ┌──────────────┐ │   │
-│  │ [Todos|Em at.|   │  │                            │  │ │ ClienteHeader│ │   │
-│  │  Aguard.|Resolv] │  │ Bubbles scroll             │  │ │ (fixo, sempre│ │   │
-│  │                  │  │ received: branco           │  │ │  visível)    │ │   │
-│  │ EM ATENDIMENTO   │  │ sent: #0E4D3B              │  │ └──────────────┘ │   │
-│  │ [• Ana ⚠  10:42] │  │ sistema: pill #FAEEDA      │  │ Tabs: [Orçament]│   │
-│  │ [• Carlos  10:38]│  │                            │  │       [Receita●]│   │
-│  │                  │  │ InputBar:                  │  │       [Pedido  ]│   │
-│  │ AGUARDANDO       │  │ 📎 + text + quick + ➤     │  │       [Histórico│   │
-│  │ [• Maria  3 msgs]│  │                            │  │                  │   │
-│  │ [• João        ] │  │                            │  │ Conteúdo da aba  │   │
-│  │                  │  │                            │  │ (scrollável)     │   │
-│  │ footer: 2·3·0    │  │                            │  │                  │   │
-│  └──────────────────┘  └────────────────────────────┘  │ [CTAs dinâmicos] │   │
+│  │ [Todos|Em at.|   │  │                            │  │ │ custHeader   │ │   │
+│  │  Aguard.|Resolv] │  │ Bubbles scroll             │  │ │ avatar 56px  │ │   │
+│  │                  │  │ received: branco           │  │ │ nome + tel   │ │   │
+│  │ fade overlay top │  │ sent: #0E4D3B              │  │ │ badges       │ │   │
+│  │ EM ATENDIMENTO   │  │ sistema: pill #FAEEDA      │  │ ├──────────────┤ │   │
+│  │ [• Ana ⚠  10:42] │  │                            │  │ │ custDetails  │ │   │
+│  │ [• Carlos  10:38]│  │ InputBar:                  │  │ │ Informações  │ │   │
+│  │                  │  │ 📎 + preview + text + ➤   │  │ ├──────────────┤ │   │
+│  │ AGUARDANDO       │  │                            │  │ │ custActions  │ │   │
+│  │ [• Maria  3 msgs]│  │                            │  │ │ Ações rápidas│ │   │
+│  │ [• João        ] │  │                            │  │ ├──────────────┤ │   │
+│  │                  │  │                            │  │ │ recentPurch. │ │   │
+│  │ fade overlay btm │  │                            │  │ │ Compras rec. │ │   │
+│  │ footer: 2·3·0    │  │                            │  │ └──────────────┘ │   │
+│  └──────────────────┘  └────────────────────────────┘  └──────────────────┘   │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -207,146 +209,85 @@ Enviar: h-10 w-10 rounded-[12px] bg-[#0E4D3B] text-[18px] hover:bg-[#0a3a2c]
 
 ---
 
-## Painel direito — Ação contextual (360px)
+## Painel direito — Cliente (360px) — Pencil `customerPanel` ID: `Wr46A`
 
-### ClienteHeader (fixo, sempre visível — fora das abas)
+Painel scrollável com 4 seções contíguas. Sem abas. Design canônico: Pencil `erp-drograria.pen` frame `Wr46A`.
+
+### Seção 1 — custHeader
 ```
-px-5 py-[18px] · border-b border-[#DCE7E1]
-layout: vertical · gap-3 · alignItems: center
+padding: pt-6 px-5 pb-[18px] · border-b border-[#DCE7E1]
+layout: vertical · items-center · gap-[14px]
 
-Avatar: 48x48 rounded-full (cor do cliente)
-  Iniciais: 2 letras · fontSize 14 · fontWeight 700 · text-white
+Avatar: 56×56 · rounded-full · bg: avatarColor do cliente
+  Iniciais: 2 letras · fontSize 20 · fontWeight 700 · text-white
 
-Nome:     fontSize 15 · fontWeight 700 · text-[#163B32]
+Nome:     fontSize 16 · fontWeight 700 · text-[#163B32]
 Telefone: fontSize 12 · text-[#7A8883]
 
-Badges: gap-1.5
-  rounded-full · bg-[#E1F5EE] · text-[#085041] · px-[10px] py-1 · fontSize 10
-
-Dados inline (grid 2 cols gap-x-4 gap-y-2):
-  Label: fontSize 9 fontWeight 600 text-[#8A9892] uppercase
-  Value: fontSize 12 fontWeight 500 text-[#173126]
-  Pontos: fontWeight 700 text-[#2D9D6E]
+Badges (horizontal, gap-[6px], flex-wrap justify-center):
+  rounded-full · bg-[#E1F5EE] · text-[#085041]
+  px-[10px] py-1 · fontSize 10 · fontWeight 600
+  "Fidelidade Ouro" + "Cliente ativo"
 ```
 
-### Tabs de ação
+### Seção 2 — custDetails (Informações)
 ```
-px-5 py-[14px] · border-b border-[#DCE7E1]
-layout: horizontal · gap-1
+padding: px-5 py-[18px] · border-b border-[#DCE7E1]
+layout: vertical · gap-[14px]
 
-Tab ativo:   rounded-full · bg-[#0E4D3B] · text-white · px-[14px] py-[7px] · fontSize 11 · fontWeight 600
-Tab inativo: rounded-full · bg-[#F2F7F4] · text-[#8A9892] · px-[14px] py-[7px] · fontSize 11 · fontWeight 500
-             stroke: border border-[#DCE7E1]
+Título: fontSize 13 · fontWeight 700 · text-[#163B32] · "Informações"
 
-Badge ● na aba Receita quando alertas[] contém "Receita pendente":
-  span inline: h-1.5 w-1.5 rounded-full bg-[#D97706] ml-1
+4 info rows (layout vertical, gap-[2px] dentro de cada):
+  Label: fontSize 10 · fontWeight 600 · text-[#8A9892]
+  Value: fontSize 12 · fontWeight 500 · text-[#173126]
 
-Ordem: Orçamento · Receita · Pedido · Histórico
-```
+Exceção — Pontos fidelidade:
+  Value: fontSize 12 · fontWeight 700 · text-[#2D9D6E]
 
-### Aba: Orçamento (NOVA)
-```
-Conteúdo: px-5 py-4 gap-4 layout vertical overflow-y-auto
-
-Campo busca produto:
-  rounded-[12px] border border-[#DCE7E1] bg-[#F2F7F4] h-9 px-3.5
-  placeholder "Buscar produto..." fontSize 13
-
-Resultados (lista):
-  Item: rounded-[12px] border border-[#DCE7E1] bg-[#F7FAF8] px-4 py-3
-        Nome: fontSize 13 fontWeight 600 text-[#173126]
-        Lab/Apres: fontSize 11 text-[#8A9892]
-        Preço: fontSize 14 fontWeight 700 text-[#173126]
-        PBM se elegível: fontSize 10 text-[#0E4D3B] "Farmácia Popular: -40%"
-        CTA [Enviar ▸]: rounded-[8px] bg-[#0E4D3B] text-white fontSize 11 px-3 py-1.5
-
-Footer das abas Orçamento/Pedido:
-  border-t border-[#DCE7E1] px-5 py-[14px] gap-2
-
-  "Converter em pedido" (quando há itens no orçamento):
-    rounded-[12px] bg-[#0E4D3B] text-white fontSize 13 fontWeight 600 py-3 w-full
-
-  "Limpar orçamento":
-    rounded-[10px] bg-white border border-[#DCE7E1] text-[#173126] fontSize 12 py-[10px]
+Rows: CPF · E-mail · Última compra · Pontos fidelidade
+TODO: GET /api/v1/cadastros/clientes/{cpf}
 ```
 
-### Aba: Receita
+### Seção 3 — custActions (Ações rápidas)
 ```
-Conteúdo: px-5 py-4 gap-3 layout vertical overflow-y-auto
+padding: px-5 py-[18px] · border-b border-[#DCE7E1]
+layout: vertical · gap-[10px]
 
-Cards ReadOnly:
-  rounded-[16px] bg-[#F7FAF8] border border-[#DCE7E1] px-4 py-3 gap-0.5
-  Label: fontSize 10 fontWeight 600 text-[#8A9892] uppercase
-  Value: fontSize 12 fontWeight 500 text-[#173126]
+Título: fontSize 13 · fontWeight 700 · text-[#163B32] · "Ações rápidas"
 
-Campos: Prescritor · CRM · Data prescrição · Validade · Protocolo
+Botão primário "Consultar produto":
+  w-full · rounded-[10px] · bg-[#0E4D3B] · text-white
+  px-[14px] py-[10px] · fontSize 12 · fontWeight 600
+  onClick → ModalBuscaProdutoChat
 
-Status badge:
-  "✓ Válida": bg-brand-75 text-success-600
-  "⚠ Pendente": bg-[#FAEEDA] text-[#633806]
-  "✗ Inválida": bg-danger-50 text-danger-700
-
-Footer:
-  "Validar receita": rounded-[12px] bg-[#0E4D3B] text-white (quando pendente)
-  "Vincular ao pedido": rounded-[10px] border border-[#DCE7E1] (quando válida)
+3 botões secundários (mesmas dimensões):
+  w-full · rounded-[10px] · bg-white · border border-[#DCE7E1]
+  px-[14px] py-[10px] · fontSize 12 · fontWeight 600 · text-[#173126]
+  "Verificar receita" (stub) · "Enviar promoção" (→ ModalEnviarTemplate) · "Registrar venda" (stub)
 ```
 
-### Aba: Pedido
+### Seção 4 — recentPurchases (Compras recentes)
 ```
-Conteúdo: px-5 py-4 gap-3 layout vertical overflow-y-auto
+padding: px-5 py-[18px]
+layout: vertical · gap-[10px]
 
-Item do pedido:
-  rounded-[16px] bg-[#F7FAF8] border border-[#DCE7E1] px-4 py-3
-  Nome + lab + apres (col esq)
-  Preço unitário (col dir, fontWeight 700)
+Título: fontSize 13 · fontWeight 700 · text-[#163B32] · "Compras recentes"
 
-Divider: bg-[#DCE7E1] h-px
+3 linhas de compra:
+  rounded-[8px] · bg-[#F7FAF8] · px-[10px] py-[8px]
+  layout: horizontal · justify-between
+  Col esq: produto (fontSize 12 #173126) + data (fontSize 10 #8A9892)
+  Col dir: preço (fontSize 12 fontWeight 600 #173126)
 
-Total:
-  rounded-[16px] bg-[#E1F5EE] border border-[#DCE7E1] px-4 py-3
-  "Total" text-[#085041] fontWeight 700
-  Valor  text-[#085041] fontSize 16 fontWeight 700
-
-Pontos: text-center fontSize 11 text-[#8A9892]
-
-Footer CTA:
-  "Separar pedido e notificar cliente":
-    rounded-[12px] bg-[#0E4D3B] text-white fontSize 13 fontWeight 600 py-3 w-full
-
-  Row secundário gap-2:
-    "Adicionar item": rounded-[10px] border border-[#DCE7E1] flex-1 py-[10px] fontSize 12
-    "Cancelar":       rounded-[10px] border border-[#DCE7E1] flex-1 py-[10px] fontSize 12 text-danger-700
-```
-
-### Aba: Histórico
-```
-Conteúdo: px-5 py-4 gap-3 layout vertical overflow-y-auto
-
-Cada compra passada:
-  rounded-[8px] bg-[#F7FAF8] px-[10px] py-2
-  layout: horizontal · justifyContent: space_between
-  Col esq: Nome (fontSize 12 fontWeight 600 #173126) + Data (fontSize 10 #8A9892)
-  Col dir: Valor (fontSize 11 fontWeight 600 #173126)
-
-Título seção: fontSize 13 fontWeight 700 text-[#163B32]
+TODO: GET /api/v1/whatsapp/conversas/{id}/compras-recentes
 ```
 
 ---
 
-## Modelo de dados unificado
+## Modelo de dados
 
 ```ts
 type ConvStatus = 'aguardando' | 'em_atendimento' | 'resolvido'
-
-type OrcamentoItem = {
-  produto_id: string
-  nome: string
-  laboratorio: string
-  apresentacao: string
-  preco: number        // centavos
-  pbm_desconto?: number // percentual
-  qty: number
-}
 
 type Conversa = {
   id: string
@@ -357,19 +298,16 @@ type Conversa = {
   unread: number
   avatarColor: string
   status: ConvStatus
-  alertas?: string[]           // ['Receita pendente'] → dot laranja + badge ● na tab
-  // Contexto farmacêutico — preenchido progressivamente:
-  receita?: {
-    prescritor: string; crm: string; data: string
-    validade: string; protocolo: string
-    status: 'pendente' | 'valida' | 'invalida'
-  } | null
-  orcamento?: OrcamentoItem[]  // itens do orçamento em construção
-  pedido?: {
-    itens: OrcamentoItem[]
-    total: number
-    pontos: number
-  } | null
+  alertas?: string[]   // ['Receita pendente'] → dot laranja na lista
+}
+
+type Bubble = {
+  id: string
+  tipo: 'recebida' | 'enviada' | 'sistema'
+  texto: string
+  hora: string
+  lido?: boolean
+  arquivo?: { nome: string; tamanho: string }
 }
 ```
 
@@ -378,29 +316,29 @@ type Conversa = {
 ## Fluxo completo — exemplo de uso
 
 ```
-1. Lista mostra "AGUARDANDO: Maria (3 msgs)"
-2. Operador clica → painel direito mostra cliente + Orçamento vazio
+1. Lista mostra "AGUARDANDO: Maria (3 msgs)" — fade overlay inferior visível
+2. Operador clica → painel direito mostra:
+   custHeader (MS avatar + nome + badges) + custDetails (CPF, e-mail, última compra, pontos)
+   custActions (Consultar produto, Verificar receita, Enviar promoção, Registrar venda)
+   recentPurchases (3 compras anteriores)
    Chat header: badge "Aguardando" + botão "Iniciar atendimento"
 
 3. Clica "Iniciar atendimento" → status 'em_atendimento'
    → Maria sobe para "EM ATENDIMENTO" na lista
    → Header chat: botões "Transferir" / "Encerrar"
 
-4. Operador vai em tab [Orçamento]:
-   → busca "dipirona 500"
-   → clica "Enviar ▸" → mensagem de orçamento injetada no chat
-   
-5. Maria envia receita (PDF no chat)
-   → badge ● aparece na tab Receita
-   → Operador vai em tab [Receita], preenche dados, clica "Validar"
-   → status "✓ Válida"
+4. Operador clica "Consultar produto" no painel direito:
+   → ModalBuscaProdutoChat abre → busca "dipirona 500" (debounce 300ms)
+   → seleciona produto → bubble formatada injetada no chat
 
-6. Clica "Vincular ao pedido" → tab [Pedido] popula automaticamente
+5. Maria envia receita (PDF no chat via 📎):
+   → preview inline na inputbar → botão ➤ envia arquivo → bubble com anexo
 
-7. Em tab [Pedido]: revisa, aplica PBM, clica "Separar pedido e notificar"
-   → mensagem automática no chat: "Seu pedido foi separado! Retire em 20 min."
-   → status → 'resolvido'
-   → Maria move para "Resolvidos" (ou some da lista principal)
+6. Operador clica "Enviar promoção" → ModalEnviarTemplate:
+   → seleciona template → substitui {{variáveis}} → preview ao vivo → envia
+
+7. Atendimento encerrado → status → 'resolvido'
+   → Maria move para "Resolvidos" na lista
 ```
 
 ---
@@ -408,17 +346,21 @@ type Conversa = {
 ## Sub-componentes locais (WhatsAppPage.tsx)
 
 ```tsx
-// Compartilhados entre todo o módulo WhatsApp (não exportados)
-function AvatarCircle({ nome, color, size }: {...})   // existente
-function BubbleMsg({ b }: { b: Bubble })               // existente
+// Utilitários compartilhados
+function AvatarCircle({ nome, color, size }: {...})   // avatar com iniciais
+function BubbleMsg({ b }: { b: Bubble })               // bubble recebida/enviada/sistema
 
-// NOVOS para AbaAtendimentos
-function ChatPanelShared({ conversa, bubbles }: {...}) // chat reutilizável
-function ClienteHeader({ conv }: {...})                // fixo no topo direito
-function AbaOrcamento({ conv, onEnviar }: {...})       // busca + resultados
-function AbaReceita({ conv }: {...})                   // campos readonly + validar
-function AbaPedido({ conv, onSeparar }: {...})         // itens + CTA
-function AbaHistorico({ conv }: {...})                 // compras passadas
+// AbaAtendimentos
+function ClienteHeader({ conv, onConsultarProduto, onEnviarPromocao }: {...})
+  // 4 seções Pencil: custHeader + custDetails + custActions + recentPurchases
+
+// Modais de ação rápida (acionados pelos botões de custActions)
+function ModalBuscaProdutoChat({ onClose, onEnviar }: {...})
+  // debounce 300ms, filtra PRODUTOS_CATALOGO ≥2 chars, injeta bubble no chat
+function ModalConsultarPedido({ onClose, onEnviar }: {...})
+  // input CPF/número, mock setTimeout 600ms, injeta bubble de status
+function ModalEnviarTemplate({ onClose, onEnviar }: {...})
+  // select TEMPLATES_WA, regex {{variavel}}, preview ao vivo, injeta bubble
 ```
 
 ---
@@ -459,32 +401,28 @@ function AbaHistorico({ conv }: {...})                 // compras passadas
 - [x] Estado único por conversa (sem Ana em dois lugares)
 - [x] Filtros: Todos / Em atend. / Aguardando / Resolvidos
 - [x] Footer com contador "N em atend. · N aguardando"
+- [x] Scroll na lista com fade dinâmico (`requestAnimationFrame`, overlays `bg-gradient-to-b/t`)
 - [x] Chat central com bubbles e inputbar
 - [x] Botão "Iniciar atendimento" quando status='aguardando'
-- [x] ClienteHeader fixo no topo do painel direito
-- [x] 4 tabs: Orçamento / Receita / Pedido / Histórico
-- [x] Badge ● na tab Receita quando alertas[] tem "Receita pendente"
-- [x] Aba Orçamento: busca + "Enviar no chat" + "Converter em pedido"
-- [x] Aba Receita: campos readonly + botão validar + status badge
-- [x] Aba Pedido: resumo + total verde + "Separar e notificar"
-- [x] Aba Histórico: compras passadas read-only
+- [x] Inputbar: 📎 file picker (JPG/PNG/WEBP/PDF/DOCX ≤16MB) + preview + progress bar
+- [x] Painel direito redesenhado com fidelidade ao Pencil `customerPanel` (Wr46A)
+- [x] custHeader: avatar 56px, nome 16px bold, tel `#7A8883`, badges Fidelidade/Ativo
+- [x] custDetails: 4 info rows (CPF, e-mail, última compra, pontos verde)
+- [x] custActions: btn primário "Consultar produto" → `ModalBuscaProdutoChat` + 3 secundários
+- [x] recentPurchases: 3 linhas `bg-[#F7FAF8] rounded-[8px]` produto + data / preço
+- [x] `ModalBuscaProdutoChat`: debounce 300ms, filtra PRODUTOS_CATALOGO, injeta bubble
+- [x] `ModalConsultarPedido`: input CPF/número, mock async 600ms, injeta bubble status
+- [x] `ModalEnviarTemplate`: select + regex `{{var}}` + preview ao vivo + injeta bubble
+- [x] AppLayout corrigido: `h-screen overflow-hidden` (scroll global eliminado)
 - [ ] Integração real EvolutionAPI (pendente backend)
+- [ ] custDetails e recentPurchases com dados reais do cliente (GET /api/v1/cadastros/clientes/{cpf})
 
-## Refinamentos Pendentes
+## Refinamentos Aplicados (Fase 7 — CHANGE-WA-001 a WA-004)
 
 | Change | Prioridade | Descrição | Status |
 |---|---|---|---|
-| [CHANGE-WA-001](./changes/CHANGE-WA-001.md) | P2 | Corrigir Espaçamento dos Botões de Ação — botões da inputbar e painel direito com gap/padding incorretos | ⬜ pending |
-| [CHANGE-WA-002](./changes/CHANGE-WA-002.md) | P2 | Scroll na Lista de Conversas — lista não scroll quando > viewport; `overflow-y-auto` + `min-h-0` faltando | ⬜ pending |
-| [CHANGE-WA-003](./changes/CHANGE-WA-003.md) | P2 | Botão "Anexar Arquivo" — input `type="file"` oculto + clique programático + preview inline na bubble | ⬜ pending |
-| [CHANGE-WA-004](./changes/CHANGE-WA-004.md) | P3 | Ações Rápidas no Chat — menu contextual com atalhos: "Enviar orçamento", "Solicitar receita", "Agendar retorno" | ⬜ pending |
-
-### O que cada change adiciona a esta tela
-
-**CHANGE-WA-001** é um fix de polish: corrige `gap` entre botões emoji/anexo/enviar na inputbar e alinha ícones do painel direito para padding consistente de `px-4`. Sem nova lógica — apenas classes Tailwind.
-
-**CHANGE-WA-002** corrige o scroll da lista de conversas (painel esquerdo 280px): adiciona `min-h-0` na cadeia flex pai → filho e `overflow-y-auto` no container da lista. O bug aparece quando há mais de ~8 conversas e o painel não propaga altura corretamente.
-
-**CHANGE-WA-003** adiciona a funcionalidade de anexo de arquivo: `<input type="file" className="hidden" ref={fileRef} />` acionado pelo botão 📎, gerando uma bubble do tipo `arquivo` com nome e tamanho. Usa o padrão `BubbleMsg` já existente (campo `b.arquivo`). Mock: adiciona mensagem localmente sem upload real.
-
-**CHANGE-WA-004** adiciona menu de ações rápidas (3 bullets) que aparece ao clicar no botão ⚡ na inputbar: "Enviar orçamento atual", "Solicitar foto da receita", "Agendar retorno em X dias". Cada ação injeta uma mensagem modelo no chat e pode pré-preencher a aba correspondente no painel direito.
+| [CHANGE-WA-001](./changes/CHANGE-WA-001.md) | P2 | Espaçamento dos botões de ação na inputbar | ✅ done |
+| [CHANGE-WA-002](./changes/CHANGE-WA-002.md) | P2 | Scroll na lista de conversas + fade suave | ✅ done |
+| [CHANGE-WA-003](./changes/CHANGE-WA-003.md) | P2 | Botão 📎 Anexar Arquivo — file picker + preview + progress bar | ✅ done |
+| [CHANGE-WA-004](./changes/CHANGE-WA-004.md) | P3 | Modais de ação rápida (ModalBuscaProdutoChat · ModalConsultarPedido · ModalEnviarTemplate) | ✅ done |
+| Pencil fidelity | P2 | Redesign painel direito: `customerPanel` Pencil `Wr46A` — 4 seções scrolláveis, sem abas | ✅ done |

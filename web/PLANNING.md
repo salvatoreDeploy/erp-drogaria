@@ -204,21 +204,25 @@ Rota: `/cadastros/fornecedores` — `CadastroFornecedoresPage.tsx`
 
 **Schema criado:** `src/schemas/whatsapp.ts` — `MensagemWhatsApp`, `TemplateWhatsApp`, `CampanhaWhatsApp`, `NovaCampanha`, `EnvioMensagem`
 
-*Implementado (versão unificada — 3 abas):*
+*Implementado (versão unificada — 3 abas, Fase 7 refinamentos aplicados):*
 - **3 abas:** Hub · Atendimentos · Campanhas (AbaConversas + AbaAtendimento fundidas em AbaAtendimentos)
 - **Hub:** status QR conectado, métricas de fila, card QR Code, card automação, log de interações com SLA
 - **Atendimentos (3 painéis unificados):**
-  - Esquerda (280px): lista única de conversas com filtro por status (Todos/Aguardando/Em atendimento/Resolvidos) + busca + badge unread
-  - Centro (flex-1): `ChatPanelShared` — header com status + bubbles + inputbar
-  - Direita (360px): `ClienteHeader` fixo + 4 tabs — **Orçamento** (busca produto → enviar no chat → converter pedido) · **Receita** (validar receita digital vinculada) · **Pedido** (confirmar + separar) · **Histórico** (compras/receitas anteriores)
+  - Esquerda (280px): lista única de conversas com filtro por status + busca + badge unread + scroll com fade dinâmico (`requestAnimationFrame + gradient overlay`)
+  - Centro (flex-1): chat — header com status + bubbles + inputbar (📎 file picker 16MB, preview inline, progress bar + texto + ➤ enviar)
+  - Direita (360px, scrollável): `ClienteHeader` redesenhado com fidelidade ao Pencil (`customerPanel` `Wr46A`):
+    - **custHeader** — avatar 56px `bg-[#0E4D3B]`, nome 16px bold `#163B32`, tel `#7A8883`, badges "Fidelidade Ouro" + "Cliente ativo" (`bg-[#E1F5EE] text-[#085041]`)
+    - **custDetails** — "Informações": 4 rows (CPF · e-mail · última compra · pontos `text-[#2D9D6E] font-bold`)
+    - **custActions** — "Ações rápidas": btn primário "Consultar produto" (`bg-[#0E4D3B] rounded-[10px]`) → `ModalBuscaProdutoChat`; "Enviar promoção" → `ModalEnviarTemplate`; + 2 stubs
+    - **recentPurchases** — "Compras recentes": 3 linhas `bg-[#F7FAF8] rounded-[8px] px-[10px] py-[8px]` (produto + data / preço)
   - Máquina de estados: `aguardando → em_atendimento → resolvido` — uma conversa, um estado
+  - Modais de ação rápida: `ModalBuscaProdutoChat` (debounce 300ms) · `ModalConsultarPedido` · `ModalEnviarTemplate` (regex `{{variavel}}` + preview)
 - **Campanhas:** métricas + tabela + ações rápidas + templates, `ModalNovaCampanha` com `NovaCampanhaSchema.safeParse()`
 - Spec canônico: `.spec/whatsapp-atendimentos.spec.md` (substitui whatsapp-conversas.spec.md + whatsapp-atendimento.spec.md)
 - `TODO: GET /api/v1/whatsapp/conversas?status=` + `POST /api/v1/whatsapp/conversas/{id}/send`
 - `TODO: POST /api/v1/whatsapp/conversas/{id}/iniciar` + `POST /api/v1/whatsapp/conversas/{id}/encerrar`
-- `TODO: POST /api/v1/whatsapp/conversas/{id}/orcamento/enviar`
-- `TODO: POST /api/v1/whatsapp/conversas/{id}/pedido/separar`
-- `TODO: POST /api/v1/whatsapp/enviar` + `GET /api/v1/whatsapp/templates` + `POST /api/v1/whatsapp/campanha`
+- `TODO: GET /api/v1/cadastros/clientes/{cpf}` (custDetails) + `GET /api/v1/whatsapp/conversas/{id}/compras-recentes`
+- `TODO: POST /api/v1/whatsapp/upload-midia` + `POST /api/v1/whatsapp/enviar` + `GET /api/v1/whatsapp/templates`
 - `TODO: WS /api/v1/whatsapp/ws` (tempo real)
 
 ---
@@ -436,26 +440,20 @@ Legenda: ⬜ Pendente · 🔴 Alta · 🟡 Média · 🟢 Normal
 
 #### WhatsApp (`/whatsapp`)
 
-| # | Prioridade | Refinamento | Spec |
+| # | Prioridade | Refinamento | Status |
 |---|---|---|---|
-| W-RX-01 | 🟡 | **Melhorias de UI — scroll, anexos, ações rápidas** | Ver spec abaixo |
+| W-RX-01 | 🟡 | **Melhorias de UI — scroll, anexos, ações rápidas + redesign painel cliente** | ✅ Concluído |
 
-**W-RX-01 — Problemas identificados e soluções:**
+**W-RX-01 — O que foi implementado (Fase 7, CHANGE-WA-001 a WA-004):**
 
-| Problema | Solução |
+| Problema | Solução implementada |
 |---|---|
-| Lista de conversas sem scroll | Adicionar `overflow-y-auto` no container da lista |
-| Botão "Anexar Arquivo" sem ação | Handler de file picker + preview de imagem/PDF inline |
-| Ações rápidas não implementadas | Interface `AcaoRapida { id, label, handler }` — consultar produto, enviar template, marcar urgente |
-| Espaçamento entre botões de ação | Revisar gap e padding no painel direito conforme Pencil |
-
-```typescript
-interface AcaoRapida {
-  id: string
-  label: string
-  handler: (conversaId: string) => Promise<void>
-}
-```
+| Lista de conversas sem scroll | `overflow-hidden` no painel + `grow overflow-y-auto` no container da lista; `AppLayout` corrigido para `h-screen overflow-hidden` |
+| Fade suave no scroll da lista | Overlay `bg-gradient-to-t/b` com `transition-opacity` + `requestAnimationFrame` para medir DOM após render |
+| Botão "Anexar Arquivo" sem ação | `fileInputRef` oculto (`sr-only`), validação tipo/tamanho (16 MB), preview miniatura/PDF, progress bar `setInterval 150ms` |
+| Ações rápidas não implementadas | `ModalBuscaProdutoChat` (debounce 300ms), `ModalConsultarPedido`, `ModalEnviarTemplate` (regex `{{var}}` + preview) |
+| Espaçamento entre botões | Corrigido `gap-2` na inputbar conforme Pencil |
+| Painel direito com abas (Orçamento/Receita/Pedido/Histórico) | Redesenhado com fidelidade ao Pencil `customerPanel` (4 seções estáticas scrolláveis) |
 
 #### Financeiro (`/financeiro`)
 
@@ -637,7 +635,9 @@ npx biome check --write ./src && npx tsc -b && npx vite build
 | 2026-05 | Composition Pattern (estilo Radix UI) para componentes com sub-partes | Namespace `{ Root, Header, Body }` + Context interno opcional — ex: `<Modal.Root>`, `<Modal.Header>` |
 | 2026-05 | Zod como fonte única de tipos nos schemas de dados | `z.infer<typeof Schema>` substitui `type` manual — validação e tipagem no mesmo lugar |
 | 2026-05 | Componentes UI promovidos quando padrão aparece em 2+ páginas | Evita divergência visual: Modal, Alert, Table e FilterTabs extraídos de 8+/6+/7+/2+ páginas |
-| 2026-05-19 | WhatsApp: AbaConversas + AbaAtendimento → AbaAtendimentos (3 abas em vez de 4) | Ana Oliveira aparecia duplicada (pendente em Conversas + em_atendimento em Atendimento) — estado conflitante. Padrão real (Blip, Huggy, Zendesk): uma conversa, um estado. Painel direito 360px fixo com ClienteHeader + 4 tabs (Orçamento/Receita/Pedido/Histórico) |
+| 2026-05-19 | WhatsApp: AbaConversas + AbaAtendimento → AbaAtendimentos (3 abas em vez de 4) | Ana Oliveira aparecia duplicada (pendente em Conversas + em_atendimento em Atendimento) — estado conflitante. Padrão real (Blip, Huggy, Zendesk): uma conversa, um estado. |
+| 2026-05-24 | WhatsApp painel direito: 4 abas (Orçamento/Receita/Pedido/Histórico) → 4 seções Pencil (`customerPanel`) | Pencil `Wr46A` mostra painel de cliente como layout estático scrollável sem abas. Ações rápidas integradas como botões em "Ações rápidas" (custActions). Modais `ModalBuscaProdutoChat`, `ModalEnviarTemplate` acionados pelos botões do painel. |
+| 2026-05-24 | AppLayout: `min-h-screen` → `h-screen overflow-hidden` | `min-h-screen` permitia o container crescer além de 100vh, causando scroll global na página em vez de scroll interno por painel. |
 | 2026-05-20 | Handler async padrão com loading/error/finally em todos os botões de I/O | Evitar UI travada e estados inconsistentes quando API retorna erro |
 | 2026-05-20 | Notificação centralizada via `useNotification()` — nunca `alert()` nativo | Consistência visual; permite log de eventos de UX; `alert()` bloqueia thread |
 | 2026-05-20 | Exportação via backend + URL assinada com log de auditoria | LGPD: rastrear quem exportou o quê e quando; evitar processamento pesado no browser |
@@ -708,17 +708,17 @@ R-D  ✅ ProdutoFormSchema.safeParse() aplicado no ModalProduto (CadastroProduto
 
 Ordem sugerida por impacto operacional:
 
-| # | Módulo | Item | SP | Dependência externa |
+| # | Módulo | Item | SP | Status |
 |---|---|---|---|---|
-| 1 | PDV | P-RX-01: Fechamento de caixa completo | 3 | — |
-| 2 | PBM | B-RX-01: Farmácia Popular HÓRUS | 8 | Layout arquivo HÓRUS (DATASUS) |
-| 3 | NF-e | F-RX-01: Importação XML v4.00 | 5 | Schema NF-e v4.00 SEFAZ |
-| 4 | Estoque | E-RX-01: Inventário guiado | 5 | — |
-| 5 | PBM | B-RX-02: Pesquisa CRM offline-first | 3 | SLA API CFM |
-| 6 | PDV | P-RX-02: Histórico de caixa | 2 | — |
-| 7 | WhatsApp | W-RX-01: Scroll + anexos + ações rápidas | 3 | — |
-| 8 | Financeiro | FIN-RX-01: Histórico mensal | 3 | — |
-| 9 | Estoque | E-RX-02: Confirmação atômica de transferência | 2 | — |
+| 1 | PDV | P-RX-01: Fechamento de caixa completo | 3 | ⬜ |
+| 2 | PBM | B-RX-01: Farmácia Popular HÓRUS | 8 | ⬜ |
+| 3 | NF-e | F-RX-01: Importação XML v4.00 | 5 | ⬜ |
+| 4 | Estoque | E-RX-01: Inventário guiado | 5 | ⬜ |
+| 5 | PBM | B-RX-02: Pesquisa CRM offline-first | 3 | ⬜ |
+| 6 | PDV | P-RX-02: Histórico de caixa | 2 | ⬜ |
+| 7 | WhatsApp | W-RX-01: Scroll + anexos + ações rápidas + redesign painel cliente | 3 | ✅ Concluído |
+| 8 | Financeiro | FIN-RX-01: Histórico mensal | 3 | ⬜ |
+| 9 | Estoque | E-RX-02: Confirmação atômica de transferência | 2 | ⬜ |
 | **Total** | | | **~34 SP** | |
 
 ---

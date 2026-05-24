@@ -2,7 +2,7 @@
 id: CHANGE-WA-004
 task: TASK-WA-004
 prioridade: P3
-status: pending
+status: done
 modulo: whatsapp
 pagina: WhatsAppPage
 arquivos:
@@ -17,12 +17,12 @@ depende-de: []
 Ícone ⚡ ou menu de ações na inputbar não tem conteúdo — atendentes não conseguem consultar produto ou enviar template sem sair do chat.
 
 ## O que implementar
-- [ ] Menu de ações rápidas: dropdown ou bottom-sheet com 3 ações iniciais
-- [ ] **Consultar Produto**: `ModalBuscaProdutoChat` → resultado formatado enviado como mensagem no chat
-- [ ] **Consultar Pedido**: input de número/CPF → status do pedido enviado como mensagem
-- [ ] **Enviar Template**: select de templates aprovados → substitui variáveis → envia
-- [ ] Interface `AcaoRapida { id, label, handler }` — extensível sem refatoração
-- [ ] Cada ação fecha o menu e executa o handler de forma assíncrona
+- [x] Menu de ações rápidas: dropdown ou bottom-sheet com 3 ações iniciais
+- [x] **Consultar Produto**: `ModalBuscaProdutoChat` → resultado formatado enviado como mensagem no chat
+- [x] **Consultar Pedido**: input de número/CPF → status do pedido enviado como mensagem
+- [x] **Enviar Template**: select de templates aprovados → substitui variáveis → envia
+- [x] Interface `AcaoRapida { id, label, handler }` — extensível sem refatoração
+- [x] Cada ação fecha o menu e executa o handler de forma assíncrona
 
 ## Arquivos alvo
 
@@ -42,4 +42,4 @@ depende-de: []
 - Tokens de cor do chat: manter todos os `#DCE7E1`, `#0E4D3B` etc.
 
 ## Resultado
-*(preencher após implementação)*
+Botão ⚡ abre dropdown `MenuAcoesRapidas` com 3 entradas via `ACOES_RAPIDAS: AcaoRapida[]`. `useEffect` fecha o menu ao pressionar Esc. `ModalBuscaProdutoChat` usa debounce 300ms (`useEffect+setTimeout`) + busca ≥2 chars sobre `PRODUTOS_CATALOGO`; clique envia bubble formatada. `ModalConsultarPedido` com campo CPF/número, handler async `setTimeout(600ms)`, bubble de status. `ModalEnviarTemplate` com select de `TEMPLATES_WA`, extração automática de `{{variáveis}}` via regex, preview ao vivo com substituição, `disabled` quando nenhum template selecionado. Função `addBubble` compartilhada pelos 3 modais via prop `onEnviar`.
