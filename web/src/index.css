@@ -1,0 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  /* --- Fontes --- */
+  --font-sans:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas,
+    "DejaVu Sans Mono", monospace;
+
+  /* --- Paleta brand (verde) --- */
+  --color-brand-25: #f0f9f5;
+  --color-brand-50: #f4f7f6;
+  --color-brand-75: #e1f5ee;
+  --color-brand-100: #dce8e2;
+  --color-brand-300: #8aada4;
+  --color-brand-400: #5a8a7a;
+  --color-brand-500: #1d9e75;
+  --color-brand-600: #179060;
+  --color-brand-700: #0b5a46;
+  --color-brand-750: #085041;
+  --color-brand-800: #083d30;
+  --color-brand-900: #0f3d32;
+  --color-brand-950: #173126;
+  --color-brand-muted: #8a9892;
+
+  /* --- Paleta warning (âmbar) --- */
+  --color-warning-25: #fefaf2;
+  --color-warning-50: #fff8ee;
+  --color-warning-100: #f3e2c5;
+  --color-warning-600: #ba7517;
+  --color-warning-700: #a36614;
+  --color-warning-800: #916000;
+  --color-warning-900: #633806;
+  --color-warning-950: #7a4e00;
+
+  /* --- Paleta danger (vermelho) --- */
+  --color-danger-25: #fff5f5;
+  --color-danger-50: #fff1f1;
+  --color-danger-100: #f3d0d0;
+  --color-danger-500: #e24b4a;
+  --color-danger-600: #cc3c3b;
+  --color-danger-700: #a33b3b;
+  --color-danger-800: #8e2d2d;
+  --color-danger-muted: #b35a5a;
+  --color-danger-900: #791f1f;
+
+  /* --- Paleta info (azul) --- */
+  --color-info-50: #eef5fb;
+  --color-info-100: #d7e4f2;
+  --color-info-700: #325b7d;
+  --color-info-900: #0c447c;
+  --color-info-950: #214666;
+
+  /* --- Brand extra --- */
+  --color-brand-200: #bfe4d5;
+
+  /* --- Paleta neutral (cinza) --- */
+  --color-neutral-50: #f1f3f2;
+  --color-neutral-100: #f1efe8;
+  --color-neutral-500: #5f5e5a;
+
+  /* --- Input (form fields) --- */
+  --color-input-bg: #f6faf8;
+  --color-input-border: #d9e7e0;
+  --color-input-label: #3f5a51;
+  --color-input-placeholder: #8ca096;
+
+  /* --- Success (indicadores positivos) --- */
+  --color-success-600: #0f7a4d;
+
+  /* --- Texto secundário --- */
+  --color-text-secondary: #5e736b;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+  }
+}

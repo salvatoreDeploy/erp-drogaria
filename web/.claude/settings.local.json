@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-vite@latest . --template react)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "PowerShell(New-Item *)",
+      "Bash(npx biome *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(Rename-Item *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\\\\src\\\\components\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(npm install *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\\\\backend\" -Recurse -Force)",
+      "Bash(ConvertTo-Csv -NoTypeInformation)",
+      "Bash(Out-String)",
+      "PowerShell(Get-Content *)",
+      "Skill(impl-module)",
+      "Bash(claude *)",
+      "Bash(dir D:\\\\projeto-erp *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\projeto-erp\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)"
+    ]
+  }
+}
