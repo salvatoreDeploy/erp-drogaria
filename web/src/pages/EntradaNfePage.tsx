@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { NfeXmlDadosSchema } from '../schemas/fiscal'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -32,6 +33,7 @@ type NfeItem = {
   noCatalog: boolean // produto não encontrado no catálogo
   produto_id?: string // preenchido após vincular ao catálogo
   margemBaixa?: boolean
+  conferido?: boolean
 }
 
 type ConferenceStatus = 'revisao' | 'bloqueado' | 'sucesso'
@@ -156,6 +158,17 @@ const CELL_INPUT_CLS =
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+type XmlStatus = 'idle' | 'validando' | 'sucesso' | 'erro'
+
+const XML_STATUS_CFG: Record<Exclude<XmlStatus, 'idle'>, { text: string; cls: string }> = {
+  validando: { text: 'Validando XML...', cls: 'border-brand-100 bg-white text-text-secondary' },
+  sucesso: {
+    text: '✓ XML importado',
+    cls: 'border-success-100 bg-brand-25 text-success-600',
+  },
+  erro: { text: '✗ XML inválido', cls: 'border-danger-100 bg-danger-50 text-danger-700' },
+}
+
 function itemIsConfirmed(item: NfeItem): boolean {
   return (
     !item.noCatalog && !!item.lote.trim() && !!item.validade.trim() && item.qtdRec === item.qtdFat
@@ -229,6 +242,18 @@ export function EntradaNfePage() {
     gerarContas: true,
   })
   const [itens, setItens] = useState<NfeItem[]>(ITENS_INICIAIS)
+  const [isLoadingRascunho, setIsLoadingRascunho] = useState(false)
+  const [rascunhoId, setRascunhoId] = useState<string | null>(null)
+  const [rascunhoDisponivel, setRascunhoDisponivel] = useState(false)
+  const [xmlStatus, setXmlStatus] = useState<XmlStatus>('idle')
+  const [xmlErro, setXmlErro] = useState<string | null>(null)
+  const [nfeFinalizada, setNfeFinalizada] = useState(false)
+  const [protocoloFinal, setProtocoloFinal] = useState<string | null>(null)
+  const xmlInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (localStorage.getItem('nfe_rascunho')) setRascunhoDisponivel(true)
+  }, [])
 
   function setField<K extends keyof FormStep1>(key: K, value: FormStep1[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -236,6 +261,128 @@ export function EntradaNfePage() {
 
   function updateItem(seq: number, patch: Partial<NfeItem>) {
     setItens((prev) => prev.map((item) => (item.seq === seq ? { ...item, ...patch } : item)))
+  }
+
+  function handleMarcarTodosOk() {
+    setItens((prev) => prev.map((i) => (i.noCatalog ? i : { ...i, conferido: true })))
+  }
+
+  const handleSalvarRascunho = async () => {
+    setIsLoadingRascunho(true)
+    try {
+      await new Promise((r) => setTimeout(r, 600))
+      const id = `NF-${Date.now()}`
+      localStorage.setItem('nfe_rascunho', JSON.stringify({ id, form, itens }))
+      setRascunhoId(id)
+      // TODO: integrar com API — POST /api/v1/fiscal/nfe/rascunho
+    } catch (err) {
+      console.error('[handleSalvarRascunho]', err)
+    } finally {
+      setIsLoadingRascunho(false)
+    }
+  }
+
+  const handleImportarXML = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setXmlStatus('validando')
+    setXmlErro(null)
+    try {
+      const text = await file.text()
+      const doc = new DOMParser().parseFromString(text, 'application/xml')
+
+      const parseErr = doc.querySelector('parsererror')
+      if (parseErr) throw new Error('Arquivo XML malformado')
+
+      const hasNfe = doc.querySelector('NFe') ?? doc.querySelector('nfeProc')
+      if (!hasNfe) throw new Error('Tag <NFe> ou <nfeProc> não encontrada')
+
+      const infNFe = doc.querySelector('infNFe')
+      const idAttr = infNFe?.getAttribute('Id') ?? ''
+      const chave = idAttr.startsWith('NFe')
+        ? idAttr.slice(3)
+        : (doc.querySelector('chNFe')?.textContent ?? '')
+      const nNF = doc.querySelector('nNF')?.textContent ?? ''
+      const xNome = doc.querySelector('emit xNome')?.textContent ?? ''
+      const cnpjRaw = (doc.querySelector('emit CNPJ')?.textContent ?? '').replace(/\D/g, '')
+      const vNF = Number(
+        doc.querySelector('ICMSTot vNF')?.textContent ??
+          doc.querySelector('vNF')?.textContent ??
+          '0'
+      )
+
+      const itensDom = Array.from(doc.querySelectorAll('det'))
+      const itensXml = itensDom.map((det) => ({
+        ean: det.querySelector('cEAN')?.textContent ?? undefined,
+        descricao: det.querySelector('xProd')?.textContent ?? '',
+        qtd_fat: Number(det.querySelector('qCom')?.textContent ?? '0'),
+        preco_unit: Number(det.querySelector('vUnCom')?.textContent ?? '0'),
+      }))
+
+      const chaveNorm = chave.replace(/\D/g, '').padStart(44, '0').slice(0, 44)
+      const cnpjNorm = cnpjRaw.padStart(14, '0').slice(0, 14)
+
+      const parsed = NfeXmlDadosSchema.safeParse({
+        chave_acesso: chaveNorm,
+        numero_nota: nNF || '0',
+        fornecedor: xNome || 'Fornecedor importado',
+        cnpj_emitente: cnpjNorm,
+        valor_total: vNF,
+        itens:
+          itensXml.length > 0
+            ? itensXml
+            : [{ descricao: 'Item importado', qtd_fat: 1, preco_unit: 0 }],
+      })
+
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues[0]?.message ?? 'Estrutura XML inválida')
+      }
+
+      const dados = parsed.data
+
+      // Auto-fill Etapa 1
+      setField('chaveAcesso', dados.chave_acesso)
+      setField('fornecedor', dados.fornecedor)
+      const cnpjFmt = dados.cnpj_emitente.replace(
+        /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+        '$1.$2.$3/$4-$5'
+      )
+      setField('cnpj', cnpjFmt)
+
+      // Popular Etapa 2
+      const novosItens: NfeItem[] = dados.itens.map((item, idx) => {
+        const desc = item.descricao.toLowerCase()
+        const nocat = !CATALOGO_MOCK.some((c) => c.toLowerCase().slice(0, 5) === desc.slice(0, 5))
+        return {
+          seq: idx + 1,
+          codigo: item.ean ?? '',
+          produto: item.descricao,
+          ncm: '3004.90',
+          ipi: 0,
+          qtdFat: item.qtd_fat,
+          qtdRec: item.qtd_fat,
+          valorUnit: item.preco_unit,
+          lote: '',
+          validade: '',
+          noCatalog: nocat,
+          margemBaixa: false,
+        }
+      })
+      setItens(novosItens)
+      setXmlStatus('sucesso')
+      // TODO: integrar com API — POST /api/v1/fiscal/nfe/importar-xml
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo'
+      setXmlErro(msg)
+      setXmlStatus('erro')
+    } finally {
+      if (xmlInputRef.current) xmlInputRef.current.value = ''
+    }
+  }
+
+  function handleFinalizarEntrada(protocolo: string) {
+    setNfeFinalizada(true)
+    setProtocoloFinal(protocolo)
   }
 
   function addItem() {
@@ -279,10 +426,36 @@ export function EntradaNfePage() {
             <span className="h-2 w-2 rounded-full bg-success-600" />
             <span className="font-bold text-[12px] text-success-600">Online</span>
           </div>
-          {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/importar-xml */}
+          {xmlStatus !== 'idle' && (
+            <span
+              className={`rounded-full border px-3 py-1.5 font-semibold text-[12px] transition-colors ${XML_STATUS_CFG[xmlStatus].cls}`}
+            >
+              {XML_STATUS_CFG[xmlStatus].text}
+            </span>
+          )}
+          {xmlErro && xmlStatus === 'erro' && (
+            <span className="max-w-[220px] truncate text-[11px] text-danger-700" title={xmlErro}>
+              {xmlErro}
+            </span>
+          )}
+          <input
+            ref={xmlInputRef}
+            type="file"
+            accept=".xml"
+            className="sr-only"
+            onChange={handleImportarXML}
+            aria-label="Importar arquivo XML NF-e"
+          />
           <button
             type="button"
-            className="flex h-9 items-center gap-1.5 rounded-[14px] bg-brand-900 px-4 font-bold text-[12px] text-white transition-colors hover:bg-brand-800"
+            disabled={nfeFinalizada || xmlStatus === 'validando'}
+            onClick={() => xmlInputRef.current?.click()}
+            className={[
+              'flex h-9 items-center gap-1.5 rounded-[14px] px-4 font-bold text-[12px] text-white transition-colors',
+              nfeFinalizada || xmlStatus === 'validando'
+                ? 'cursor-not-allowed bg-brand-300'
+                : 'bg-brand-900 hover:bg-brand-800',
+            ].join(' ')}
           >
             Importar XML
           </button>
@@ -298,8 +471,8 @@ export function EntradaNfePage() {
             <div key={s.id} className="flex items-center">
               <button
                 type="button"
-                disabled={!done}
-                onClick={() => done && setStep(s.id as Step)}
+                disabled={!done || nfeFinalizada}
+                onClick={() => done && !nfeFinalizada && setStep(s.id as Step)}
                 className="flex items-center gap-2.5 disabled:cursor-default"
               >
                 <div
@@ -335,7 +508,16 @@ export function EntradaNfePage() {
 
       {/* ── Step panels ────────────────────────────────────────── */}
       {step === 1 && (
-        <StepIdentificacao form={form} setField={setField} onNext={() => setStep(2)} />
+        <StepIdentificacao
+          form={form}
+          setField={setField}
+          onNext={() => setStep(2)}
+          rascunhoDisponivel={rascunhoDisponivel}
+          isLoadingRascunho={isLoadingRascunho}
+          onSalvarRascunho={handleSalvarRascunho}
+          onIgnorarRascunho={() => setRascunhoDisponivel(false)}
+          nfeFinalizada={nfeFinalizada}
+        />
       )}
       {step === 2 && (
         <StepItens
@@ -345,9 +527,24 @@ export function EntradaNfePage() {
           removeItem={removeItem}
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
+          isLoadingRascunho={isLoadingRascunho}
+          onSalvarRascunho={handleSalvarRascunho}
+          nfeFinalizada={nfeFinalizada}
         />
       )}
-      {step === 3 && <StepConferencia itens={itens} onBack={() => setStep(2)} />}
+      {step === 3 && (
+        <StepConferencia
+          itens={itens}
+          onBack={() => setStep(2)}
+          onMarcarTodosOk={handleMarcarTodosOk}
+          isLoadingRascunho={isLoadingRascunho}
+          onSalvarRascunho={handleSalvarRascunho}
+          rascunhoId={rascunhoId}
+          nfeFinalizada={nfeFinalizada}
+          protocoloFinal={protocoloFinal}
+          onFinalizarEntrada={handleFinalizarEntrada}
+        />
+      )}
     </div>
   )
 }
@@ -358,16 +555,65 @@ function StepIdentificacao({
   form,
   setField,
   onNext,
+  rascunhoDisponivel,
+  isLoadingRascunho,
+  onSalvarRascunho,
+  onIgnorarRascunho,
+  nfeFinalizada,
 }: {
   form: FormStep1
   setField: <K extends keyof FormStep1>(key: K, value: FormStep1[K]) => void
   onNext: () => void
+  rascunhoDisponivel: boolean
+  isLoadingRascunho: boolean
+  onSalvarRascunho: () => Promise<void>
+  onIgnorarRascunho: () => void
+  nfeFinalizada: boolean
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-[24px] border border-brand-100 bg-white">
       <div className="flex min-h-0 flex-1 gap-6 overflow-y-auto p-6">
         {/* Form */}
         <div className="flex flex-1 flex-col gap-4">
+          {rascunhoDisponivel && (
+            <div className="flex items-center justify-between gap-3 rounded-[14px] border border-brand-200 bg-brand-25 px-4 py-3">
+              <div>
+                <p className="font-bold text-[13px] text-brand-950">Rascunho salvo encontrado</p>
+                <p className="text-[11px] text-text-secondary">
+                  Deseja retomar a nota fiscal que estava sendo editada?
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={onIgnorarRascunho}
+                  className="flex h-8 items-center rounded-[10px] border border-brand-100 px-3 font-semibold text-[12px] text-brand-muted hover:bg-brand-50"
+                >
+                  Ignorar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const raw = localStorage.getItem('nfe_rascunho')
+                    if (raw) {
+                      onIgnorarRascunho()
+                    }
+                  }}
+                  className="flex h-8 items-center rounded-[10px] bg-brand-900 px-3 font-bold text-[12px] text-white hover:bg-brand-800"
+                >
+                  Retomar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {nfeFinalizada && (
+            <div className="flex items-center gap-2 rounded-[12px] border border-brand-100 bg-[#F5F8F6] px-4 py-2.5">
+              <span className="font-bold text-[12px] text-brand-700">✓ Nota finalizada</span>
+              <span className="text-[12px] text-text-secondary">— modo somente leitura</span>
+            </div>
+          )}
+
           <h2 className="font-bold text-[15px] text-brand-950">Dados da nota</h2>
 
           <FieldGroup label="Chave de acesso NF-e (44 dígitos)">
@@ -377,7 +623,8 @@ function StepIdentificacao({
               placeholder="00000000000000000000000000000000000000000000"
               value={form.chaveAcesso}
               onChange={(e) => setField('chaveAcesso', e.target.value)}
-              className={`${INPUT_CLS} font-mono text-[12px] tracking-wider`}
+              disabled={nfeFinalizada}
+              className={`${INPUT_CLS} font-mono text-[12px] tracking-wider disabled:opacity-60`}
             />
           </FieldGroup>
 
@@ -462,11 +709,14 @@ function StepIdentificacao({
             </select>
           </FieldGroup>
 
-          <label className="flex cursor-pointer items-center gap-2.5">
+          <label
+            className={`flex items-center gap-2.5 ${nfeFinalizada ? 'cursor-default opacity-60' : 'cursor-pointer'}`}
+          >
             <input
               type="checkbox"
               checked={form.gerarContas}
               onChange={(e) => setField('gerarContas', e.target.checked)}
+              disabled={nfeFinalizada}
               className="h-4 w-4 accent-brand-700"
             />
             <span className="text-[13px] text-brand-950">Gerar contas a pagar automaticamente</span>
@@ -507,7 +757,12 @@ function StepIdentificacao({
         </div>
       </div>
 
-      <StepFooter onNext={onNext} nextLabel="Próximo" />
+      <StepFooter
+        onNext={onNext}
+        nextLabel="Próximo"
+        isLoadingRascunho={isLoadingRascunho}
+        onSalvarRascunho={onSalvarRascunho}
+      />
     </div>
   )
 }
@@ -521,6 +776,9 @@ function StepItens({
   removeItem,
   onBack,
   onNext,
+  isLoadingRascunho,
+  onSalvarRascunho,
+  nfeFinalizada,
 }: {
   itens: NfeItem[]
   updateItem: (seq: number, patch: Partial<NfeItem>) => void
@@ -528,6 +786,9 @@ function StepItens({
   removeItem: (seq: number) => void
   onBack: () => void
   onNext: () => void
+  isLoadingRascunho: boolean
+  onSalvarRascunho: () => Promise<void>
+  nfeFinalizada: boolean
 }) {
   const stats = useMemo(
     () => ({
@@ -738,16 +999,18 @@ function StepItens({
           </div>
 
           {/* Add row button */}
-          <div className="px-4 py-3">
-            {/* TODO: integrar com API — GET /api/v1/produtos/buscar para autocomplete do produto */}
-            <button
-              type="button"
-              onClick={addItem}
-              className="flex h-[38px] items-center gap-1.5 rounded-[10px] border border-brand-100 px-3 font-semibold text-[12px] text-text-secondary transition-colors hover:border-brand-300 hover:text-brand-950"
-            >
-              + Adicionar linha
-            </button>
-          </div>
+          {!nfeFinalizada && (
+            <div className="px-4 py-3">
+              {/* TODO: integrar com API — GET /api/v1/produtos/buscar para autocomplete do produto */}
+              <button
+                type="button"
+                onClick={addItem}
+                className="flex h-[38px] items-center gap-1.5 rounded-[10px] border border-brand-100 px-3 font-semibold text-[12px] text-text-secondary transition-colors hover:border-brand-300 hover:text-brand-950"
+              >
+                + Adicionar linha
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Totals bar */}
@@ -758,7 +1021,13 @@ function StepItens({
         </div>
       </div>
 
-      <StepFooter onBack={onBack} onNext={onNext} nextLabel="Conferência" />
+      <StepFooter
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="Conferência"
+        isLoadingRascunho={isLoadingRascunho}
+        onSalvarRascunho={onSalvarRascunho}
+      />
     </div>
   )
 }
@@ -810,11 +1079,60 @@ const FOOTER_NOTE: Record<ConferenceStatus, { text: string; cls: string }> = {
   },
 }
 
-function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => void }) {
+type FiscalValues = { icmsTotal: number; pisCofins: number; valorFinal: number }
+
+function StepConferencia({
+  itens,
+  onBack,
+  onMarcarTodosOk,
+  isLoadingRascunho,
+  onSalvarRascunho,
+  rascunhoId,
+  nfeFinalizada,
+  protocoloFinal,
+  onFinalizarEntrada,
+}: {
+  itens: NfeItem[]
+  onBack: () => void
+  onMarcarTodosOk: () => void
+  isLoadingRascunho: boolean
+  onSalvarRascunho: () => Promise<void>
+  rascunhoId: string | null
+  nfeFinalizada: boolean
+  protocoloFinal: string | null
+  onFinalizarEntrada: (protocolo: string) => void
+}) {
   const [status, setStatus] = useState<ConferenceStatus>('revisao')
+  const [marcarTodosOpen, setMarcarTodosOpen] = useState(false)
+  const [arredondamentoOpen, setArredondamentoOpen] = useState(false)
+  const [finalizarOpen, setFinalizarOpen] = useState(false)
+  const [isLoadingFinalizar, setIsLoadingFinalizar] = useState(false)
+  const [fiscalValues, setFiscalValues] = useState<FiscalValues>({
+    icmsTotal: NFE_INFO.icmsTotal,
+    pisCofins: NFE_INFO.pisCofins,
+    valorFinal: NFE_INFO.valorFinal,
+  })
 
   const canConfirm = status !== 'bloqueado'
   const isSuccess = status === 'sucesso'
+  const noCatalogCount = itens.filter((i) => i.noCatalog).length
+  const confirmaveisCount = itens.filter((i) => !i.noCatalog && !i.conferido).length
+
+  const handleFinalizarConfirmado = async () => {
+    setIsLoadingFinalizar(true)
+    try {
+      await new Promise((r) => setTimeout(r, 1200))
+      const protocolo = `EN-${Date.now()}`
+      onFinalizarEntrada(protocolo)
+      setStatus('sucesso')
+      setFinalizarOpen(false)
+      // TODO: integrar com API — POST /api/v1/fiscal/nfe/confirmar
+    } catch (err) {
+      console.error('[handleFinalizarConfirmado]', err)
+    } finally {
+      setIsLoadingFinalizar(false)
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-[24px] border border-brand-100 bg-white">
@@ -909,16 +1227,21 @@ function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => vo
             </div>
 
             <div className="flex gap-2">
-              {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/marcar-todos-ok */}
               <button
                 type="button"
-                className="flex h-[34px] items-center rounded-[10px] border border-success-600 px-3 font-bold text-[12px] text-success-600 transition-colors hover:bg-brand-25"
+                onClick={() => setMarcarTodosOpen(true)}
+                className="flex h-[34px] items-center gap-1.5 rounded-[10px] border border-success-600 px-3 font-bold text-[12px] text-success-600 transition-colors hover:bg-brand-25"
               >
                 Marcar todos como OK
+                {noCatalogCount > 0 && (
+                  <span className="rounded-full bg-warning-50 px-1.5 py-0.5 font-bold text-[10px] text-warning-700">
+                    {noCatalogCount} pendente{noCatalogCount > 1 ? 's' : ''}
+                  </span>
+                )}
               </button>
-              {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/arredondamento */}
               <button
                 type="button"
+                onClick={() => setArredondamentoOpen(true)}
                 className="flex h-[34px] items-center rounded-[10px] border border-brand-100 bg-white px-3 font-semibold text-[12px] text-brand-muted transition-colors hover:bg-brand-50"
               >
                 Aplicar arredondamento fiscal
@@ -946,10 +1269,10 @@ function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => vo
                 Base ICMS: <span className="font-semibold">{fmt(NFE_INFO.baseIcms)}</span>
               </p>
               <p className="text-[12px] text-brand-950">
-                ICMS total: <span className="font-semibold">{fmt(NFE_INFO.icmsTotal)}</span>
+                ICMS total: <span className="font-semibold">{fmt(fiscalValues.icmsTotal)}</span>
               </p>
               <p className="text-[12px] text-brand-950">
-                PIS/COFINS: <span className="font-semibold">{fmt(NFE_INFO.pisCofins)}</span>
+                PIS/COFINS: <span className="font-semibold">{fmt(fiscalValues.pisCofins)}</span>
               </p>
               <p className="text-[12px] text-brand-950">
                 Frete: <span className="font-semibold">{fmt(NFE_INFO.frete)}</span>
@@ -959,7 +1282,7 @@ function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => vo
             <div className="flex items-baseline justify-between">
               <span className="font-bold text-[13px] text-brand-950">Valor final</span>
               <span className="font-bold text-[16px] text-brand-700">
-                {fmt(NFE_INFO.valorFinal)}
+                {fmt(fiscalValues.valorFinal)}
               </span>
             </div>
             <div className="flex flex-col gap-1 rounded-[12px] border border-input-border bg-input-bg p-2.5">
@@ -974,78 +1297,120 @@ function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => vo
           </div>
 
           {/* Conferência final */}
-          <div className="flex flex-col gap-3 rounded-[18px] border border-brand-100 bg-white p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-[14px] text-brand-950">Conferência final</h2>
-              <div className="flex gap-1">
-                {(['revisao', 'bloqueado', 'sucesso'] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatus(s)}
-                    className={[
-                      'rounded-full px-2 py-0.5 font-mono text-[9px] uppercase transition-colors',
-                      status === s
-                        ? 'bg-brand-100 text-brand-750'
-                        : 'text-brand-muted hover:bg-brand-50',
-                    ].join(' ')}
-                  >
-                    {s}
-                  </button>
-                ))}
+          {nfeFinalizada && protocoloFinal ? (
+            <div className="flex flex-col items-center gap-4 rounded-[18px] border border-brand-100 bg-brand-25 p-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-700">
+                <span className="font-bold text-[20px] text-white leading-none">✓</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 text-center">
+                <p className="font-bold text-[15px] text-brand-950">Entrada finalizada</p>
+                <p className="font-mono text-[12px] text-text-secondary">{protocoloFinal}</p>
+                <p className="text-[11px] text-text-secondary">
+                  Estoque e financeiro atualizados automaticamente.
+                </p>
+              </div>
+              <div className="flex w-full flex-col gap-2">
+                <Link
+                  to="/financeiro"
+                  className="flex h-10 items-center justify-center rounded-[12px] bg-brand-900 font-bold text-[13px] text-white hover:bg-brand-800"
+                >
+                  Ver contas a pagar →
+                </Link>
+                <button
+                  type="button"
+                  className="flex h-10 items-center justify-center rounded-[12px] border border-brand-200 font-semibold text-[13px] text-brand-700 hover:bg-brand-50"
+                >
+                  Gerar etiquetas
+                </button>
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col gap-3 rounded-[18px] border border-brand-100 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-[14px] text-brand-950">Conferência final</h2>
+                <div className="flex gap-1">
+                  {(['revisao', 'bloqueado', 'sucesso'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className={[
+                        'rounded-full px-2 py-0.5 font-mono text-[9px] uppercase transition-colors',
+                        status === s
+                          ? 'bg-brand-100 text-brand-750'
+                          : 'text-brand-muted hover:bg-brand-50',
+                      ].join(' ')}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            <p className="text-[12px] text-text-secondary">{CONFERENCE_MSG[status]}</p>
+              <p className="text-[12px] text-text-secondary">{CONFERENCE_MSG[status]}</p>
 
-            {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/confirmar */}
-            <button
-              type="button"
-              disabled={!canConfirm}
-              onClick={() => canConfirm && !isSuccess && setStatus('sucesso')}
-              className={[
-                'flex h-11 items-center justify-center rounded-[10px] font-bold text-[13px] text-white transition-colors',
-                canConfirm
-                  ? isSuccess
-                    ? 'cursor-default bg-brand-800'
-                    : 'bg-brand-900 hover:bg-brand-800'
-                  : 'cursor-not-allowed bg-brand-300',
-              ].join(' ')}
-            >
-              {isSuccess ? '✓ Entrada confirmada' : 'Confirmar entrada'}
-            </button>
+              <button
+                type="button"
+                disabled={!canConfirm || isSuccess}
+                onClick={() => canConfirm && !isSuccess && setFinalizarOpen(true)}
+                className={[
+                  'flex h-11 items-center justify-center rounded-[10px] font-bold text-[13px] text-white transition-colors',
+                  canConfirm
+                    ? isSuccess
+                      ? 'cursor-default bg-brand-800'
+                      : 'bg-brand-900 hover:bg-brand-800'
+                    : 'cursor-not-allowed bg-brand-300',
+                ].join(' ')}
+              >
+                {isSuccess ? '✓ Entrada confirmada' : 'Finalizar entrada'}
+              </button>
 
-            <button
-              type="button"
-              onClick={onBack}
-              className="flex h-10 items-center justify-center rounded-[10px] border border-brand-100 font-semibold text-[13px] text-brand-muted transition-colors hover:bg-brand-50"
-            >
-              Corrigir itens
-            </button>
+              <button
+                type="button"
+                onClick={onBack}
+                className="flex h-10 items-center justify-center rounded-[10px] border border-brand-100 font-semibold text-[13px] text-brand-muted transition-colors hover:bg-brand-50"
+              >
+                Corrigir itens
+              </button>
 
-            <div className="flex flex-col gap-1 rounded-[12px] border border-input-border bg-input-bg p-2.5">
-              <p className="font-bold text-[11px] text-brand-950">Rastro de auditoria</p>
-              <p className="text-[11px] text-text-secondary">10:42 • XML importado por Ana</p>
-              <p className="text-[11px] text-text-secondary">
-                10:47 • Itens vinculados automaticamente
-              </p>
-              <p className="text-[11px] text-text-secondary">
-                10:53 • Revisão fiscal concluída por João
-              </p>
+              <div className="flex flex-col gap-1 rounded-[12px] border border-input-border bg-input-bg p-2.5">
+                <p className="font-bold text-[11px] text-brand-950">Rastro de auditoria</p>
+                <p className="text-[11px] text-text-secondary">10:42 • XML importado por Ana</p>
+                <p className="text-[11px] text-text-secondary">
+                  10:47 • Itens vinculados automaticamente
+                </p>
+                <p className="text-[11px] text-text-secondary">
+                  10:53 • Revisão fiscal concluída por João
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Footer */}
       <div className="flex items-center justify-between border-brand-100 border-t px-6 py-4">
-        <span className={`text-[12px] ${FOOTER_NOTE[status].cls}`}>{FOOTER_NOTE[status].text}</span>
+        <div className="flex flex-col gap-0.5">
+          <span className={`text-[12px] ${FOOTER_NOTE[status].cls}`}>
+            {FOOTER_NOTE[status].text}
+          </span>
+          {rascunhoId && (
+            <span className="text-[11px] text-text-secondary">Rascunho salvo: {rascunhoId}</span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="flex h-10 items-center rounded-[10px] border border-brand-100 px-4 font-semibold text-[13px] text-brand-muted transition-colors hover:bg-brand-50"
+            disabled={isLoadingRascunho}
+            onClick={onSalvarRascunho}
+            className={[
+              'flex h-10 items-center rounded-[10px] border border-brand-100 px-4 font-semibold text-[13px] transition-colors',
+              isLoadingRascunho
+                ? 'cursor-not-allowed text-brand-muted opacity-60'
+                : 'text-brand-muted hover:bg-brand-50',
+            ].join(' ')}
           >
-            Cancelar
+            {isLoadingRascunho ? 'Salvando...' : 'Salvar rascunho'}
           </button>
           <button
             type="button"
@@ -1054,24 +1419,58 @@ function StepConferencia({ itens, onBack }: { itens: NfeItem[]; onBack: () => vo
           >
             Voltar
           </button>
-          {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/confirmar */}
           <button
             type="button"
-            disabled={!canConfirm}
-            onClick={() => canConfirm && !isSuccess && setStatus('sucesso')}
+            disabled={!canConfirm || nfeFinalizada}
+            onClick={() => canConfirm && !nfeFinalizada && setFinalizarOpen(true)}
             className={[
               'flex h-10 items-center rounded-[10px] px-4 font-bold text-[13px] text-white transition-colors',
-              canConfirm
-                ? isSuccess
-                  ? 'cursor-default bg-brand-800'
-                  : 'bg-brand-900 hover:bg-brand-800'
+              canConfirm && !nfeFinalizada
+                ? 'bg-brand-900 hover:bg-brand-800'
                 : 'cursor-not-allowed bg-brand-300',
             ].join(' ')}
           >
-            Finalizar entrada
+            {nfeFinalizada ? '✓ Finalizado' : 'Finalizar entrada'}
           </button>
         </div>
       </div>
+
+      {marcarTodosOpen && (
+        <ModalMarcarTodosOk
+          confirmaveisCount={confirmaveisCount}
+          noCatalogCount={noCatalogCount}
+          onClose={() => setMarcarTodosOpen(false)}
+          onConfirm={() => {
+            onMarcarTodosOk()
+            setMarcarTodosOpen(false)
+          }}
+        />
+      )}
+
+      {arredondamentoOpen && (
+        <ModalArredondamentoFiscal
+          original={{
+            icmsTotal: NFE_INFO.icmsTotal,
+            pisCofins: NFE_INFO.pisCofins,
+            valorFinal: NFE_INFO.valorFinal,
+          }}
+          onClose={() => setArredondamentoOpen(false)}
+          onAplicar={(rounded) => {
+            setFiscalValues(rounded)
+            setArredondamentoOpen(false)
+          }}
+        />
+      )}
+
+      {finalizarOpen && (
+        <ModalFinalizarEntrada
+          itens={itens}
+          fiscalValues={fiscalValues}
+          isLoading={isLoadingFinalizar}
+          onClose={() => setFinalizarOpen(false)}
+          onConfirmar={handleFinalizarConfirmado}
+        />
+      )}
     </div>
   )
 }
@@ -1082,10 +1481,14 @@ function StepFooter({
   onBack,
   onNext,
   nextLabel,
+  isLoadingRascunho = false,
+  onSalvarRascunho,
 }: {
   onBack?: () => void
   onNext: () => void
   nextLabel: string
+  isLoadingRascunho?: boolean
+  onSalvarRascunho?: () => Promise<void>
 }) {
   return (
     <div className="flex items-center justify-between border-brand-100 border-t px-6 py-4">
@@ -1106,13 +1509,21 @@ function StepFooter({
         </button>
       )}
       <div className="flex items-center gap-2">
-        {/* TODO: integrar com API — POST /api/v1/fiscal/nfe/rascunho */}
-        <button
-          type="button"
-          className="flex h-9 items-center rounded-[14px] border border-brand-100 bg-white px-4 font-bold text-[12px] text-brand-950 transition-colors hover:bg-brand-50"
-        >
-          Salvar rascunho
-        </button>
+        {onSalvarRascunho && (
+          <button
+            type="button"
+            disabled={isLoadingRascunho}
+            onClick={onSalvarRascunho}
+            className={[
+              'flex h-9 items-center rounded-[14px] border border-brand-100 bg-white px-4 font-bold text-[12px] transition-colors',
+              isLoadingRascunho
+                ? 'cursor-not-allowed text-brand-muted opacity-60'
+                : 'text-brand-950 hover:bg-brand-50',
+            ].join(' ')}
+          >
+            {isLoadingRascunho ? 'Salvando...' : 'Salvar rascunho'}
+          </button>
+        )}
         <button
           type="button"
           onClick={onNext}
@@ -1192,6 +1603,277 @@ function TotalCell({
       >
         {value}
       </span>
+    </div>
+  )
+}
+
+/* ── Modal: Marcar todos como OK ───────────────────────────────────── */
+
+function ModalMarcarTodosOk({
+  confirmaveisCount,
+  noCatalogCount,
+  onClose,
+  onConfirm,
+}: {
+  confirmaveisCount: number
+  noCatalogCount: number
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[460px] flex-col gap-5 rounded-[28px] bg-white p-6 shadow-xl">
+        <div className="flex flex-col gap-1">
+          <p className="font-bold text-[18px] text-brand-950">Marcar itens como OK</p>
+          <p className="text-[13px] text-text-secondary">
+            Confirme o reconhecimento dos itens conferidos.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-[16px] border border-brand-100 bg-input-bg p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] text-brand-950">Itens a serem marcados como OK</span>
+            <span className="font-bold text-[14px] text-brand-700">{confirmaveisCount}</span>
+          </div>
+          {noCatalogCount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-warning-700">
+                ⚠ Sem catálogo (permanecem pendentes)
+              </span>
+              <span className="font-bold text-[14px] text-warning-700">{noCatalogCount}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 flex-1 items-center justify-center rounded-[14px] border border-brand-200 font-bold text-[13px] text-brand-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex h-10 flex-1 items-center justify-center rounded-[14px] bg-brand-900 font-bold text-[13px] text-white hover:bg-brand-800"
+          >
+            Confirmar ({confirmaveisCount} iten{confirmaveisCount !== 1 ? 's' : ''})
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Modal: Arredondamento Fiscal ──────────────────────────────────── */
+
+const FISCAL_BRUTO = {
+  icmsTotal: NFE_INFO.icmsTotal,
+  pisCofins: NFE_INFO.pisCofins,
+  valorFinal: NFE_INFO.valorFinal,
+}
+
+function round2(v: number) {
+  return Math.round(v * 100) / 100
+}
+
+function ModalArredondamentoFiscal({
+  original,
+  onClose,
+  onAplicar,
+}: {
+  original: FiscalValues
+  onClose: () => void
+  onAplicar: (rounded: FiscalValues) => void
+}) {
+  const rounded: FiscalValues = {
+    icmsTotal: round2(FISCAL_BRUTO.icmsTotal),
+    pisCofins: round2(FISCAL_BRUTO.pisCofins),
+    valorFinal: round2(FISCAL_BRUTO.valorFinal),
+  }
+
+  const diffTotal =
+    round2(original.icmsTotal - rounded.icmsTotal) +
+    round2(original.pisCofins - rounded.pisCofins) +
+    round2(original.valorFinal - rounded.valorFinal)
+
+  const rows: Array<{ label: string; before: number; after: number }> = [
+    { label: 'ICMS total', before: original.icmsTotal, after: rounded.icmsTotal },
+    { label: 'PIS/COFINS', before: original.pisCofins, after: rounded.pisCofins },
+    { label: 'Valor final', before: original.valorFinal, after: rounded.valorFinal },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[520px] flex-col gap-5 rounded-[28px] bg-white p-6 shadow-xl">
+        <div className="flex flex-col gap-1">
+          <p className="font-bold text-[18px] text-brand-950">Arredondamento fiscal</p>
+          <p className="text-[13px] text-text-secondary">
+            Valores ajustados a 2 casas decimais conforme SEFAZ.
+          </p>
+        </div>
+
+        <div className="flex flex-col overflow-hidden rounded-[16px] border border-brand-100">
+          <div className="grid grid-cols-[1fr_110px_110px] gap-2 bg-[#F5F8F6] px-4 py-2.5">
+            {['Campo', 'Antes', 'Depois'].map((h) => (
+              <span key={h} className="font-semibold text-[11px] text-text-secondary">
+                {h}
+              </span>
+            ))}
+          </div>
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              className="grid grid-cols-[1fr_110px_110px] items-center gap-2 border-brand-100 border-t bg-[#FBFCFB] px-4 py-2.5"
+            >
+              <span className="text-[12px] text-brand-950">{row.label}</span>
+              <span className="font-mono text-[12px] text-text-secondary">{fmt(row.before)}</span>
+              <span className="font-mono font-semibold text-[12px] text-brand-950">
+                {fmt(row.after)}
+              </span>
+            </div>
+          ))}
+          <div className="grid grid-cols-[1fr_110px_110px] items-center gap-2 border-brand-200 border-t bg-white px-4 py-2.5">
+            <span className="font-bold text-[12px] text-brand-950">Diferença total</span>
+            <span />
+            <span
+              className={`font-bold font-mono text-[12px] ${Math.abs(diffTotal) < 0.005 ? 'text-success-600' : 'text-warning-700'}`}
+            >
+              {diffTotal === 0 ? '—' : fmt(Math.abs(diffTotal))}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 flex-1 items-center justify-center rounded-[14px] border border-brand-200 font-bold text-[13px] text-brand-700"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onAplicar(rounded)}
+            className="flex h-10 flex-1 items-center justify-center rounded-[14px] bg-brand-900 font-bold text-[13px] text-white hover:bg-brand-800"
+          >
+            Aplicar arredondamento
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Modal: Finalizar Entrada ──────────────────────────────────────── */
+
+function ModalFinalizarEntrada({
+  itens,
+  fiscalValues,
+  isLoading,
+  onClose,
+  onConfirmar,
+}: {
+  itens: NfeItem[]
+  fiscalValues: FiscalValues
+  isLoading: boolean
+  onClose: () => void
+  onConfirmar: () => Promise<void>
+}) {
+  const qtdItens = itens.filter((i) => !i.noCatalog).length
+  const vencimento = new Date()
+  vencimento.setDate(vencimento.getDate() + 30)
+  const vencStr = vencimento.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-brand-950/30"
+        aria-label="Fechar modal"
+      />
+      <div className="relative z-10 flex w-[480px] flex-col gap-5 rounded-[28px] bg-white p-6 shadow-xl">
+        <div className="flex flex-col gap-1">
+          <p className="font-bold text-[18px] text-brand-950">Confirmar entrada de nota</p>
+          <p className="text-[13px] text-text-secondary">
+            Revise os dados antes de confirmar. Esta ação não pode ser desfeita.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-[16px] border border-brand-100 bg-input-bg p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-text-secondary">Fornecedor</span>
+            <span className="font-semibold text-[13px] text-brand-950">{NFE_INFO.fornecedor}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-text-secondary">Número da nota</span>
+            <span className="font-mono font-semibold text-[12px] text-brand-950">
+              {NFE_INFO.numeroNota}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-text-secondary">Qtd itens</span>
+            <span className="font-semibold text-[13px] text-brand-950">{qtdItens} SKUs</span>
+          </div>
+          <div className="h-px bg-brand-100" />
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-text-secondary">Valor final</span>
+            <span className="font-bold text-[14px] text-brand-950">
+              {fmt(fiscalValues.valorFinal)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] text-text-secondary">Vencimento 1ª parcela</span>
+            <span className="font-semibold text-[12px] text-brand-950">{vencStr}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5 rounded-[12px] border border-warning-100 bg-warning-25 p-3">
+          <p className="font-semibold text-[12px] text-warning-700">
+            ⚠ Ao confirmar, o estoque será atualizado e as contas a pagar lançadas no financeiro.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            className="flex h-10 flex-1 items-center justify-center rounded-[14px] border border-brand-200 font-bold text-[13px] text-brand-700 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={isLoading}
+            className={[
+              'flex h-10 flex-1 items-center justify-center rounded-[14px] font-bold text-[13px] text-white transition-colors',
+              isLoading ? 'cursor-not-allowed bg-brand-400' : 'bg-brand-900 hover:bg-brand-800',
+            ].join(' ')}
+          >
+            {isLoading ? 'Confirmando...' : 'Confirmar entrada'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

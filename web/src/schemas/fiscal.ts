@@ -36,3 +36,21 @@ export const NfeEmissaoSchema = z.object({
   ),
 })
 export type NfeEmissao = z.infer<typeof NfeEmissaoSchema>
+
+export const NfeXmlItemSchema = z.object({
+  ean: z.string().optional(),
+  descricao: z.string(),
+  qtd_fat: z.number(),
+  preco_unit: z.number(),
+})
+
+export const NfeXmlDadosSchema = z.object({
+  chave_acesso: z.string().length(44, 'Chave de acesso deve ter 44 dígitos'),
+  numero_nota: z.string(),
+  fornecedor: z.string(),
+  cnpj_emitente: z.string().length(14, 'CNPJ deve ter 14 dígitos'),
+  valor_total: z.number(),
+  itens: z.array(NfeXmlItemSchema).min(1, 'NF-e deve ter ao menos 1 item'),
+})
+export type NfeXmlDados = z.infer<typeof NfeXmlDadosSchema>
+export type NfeXmlItem = z.infer<typeof NfeXmlItemSchema>

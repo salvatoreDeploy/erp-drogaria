@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ModalHistoricoCaixa } from '../components/pdv/ModalHistoricoCaixa'
 import { Button, SelectItem, SelectList, SelectRoot, SelectTrigger } from '../components/ui'
 
 type CaixaStatus = 'aberto' | 'fechado'
@@ -28,6 +29,7 @@ function fmtDateTime(d: Date) {
 export function AberturaCaixaPage() {
   const [caixa, setCaixa] = useState('caixa01')
   const [fundo, setFundo] = useState('0,00')
+  const [historicoOpen, setHistoricoOpen] = useState(false)
   const now = new Date()
   const navigate = useNavigate()
 
@@ -107,11 +109,14 @@ export function AberturaCaixaPage() {
 
         <button
           type="button"
+          onClick={() => setHistoricoOpen(true)}
           className="text-center font-semibold text-[13px] text-brand-700 hover:underline"
         >
           Ver histórico de caixas
         </button>
       </div>
+
+      {historicoOpen && <ModalHistoricoCaixa onClose={() => setHistoricoOpen(false)} />}
 
       {/* ── Status dos caixas ────────────────────────────────── */}
       <div className="flex w-92 shrink-0 flex-col gap-3">

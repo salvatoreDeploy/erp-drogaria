@@ -1,5 +1,19 @@
 import { z } from 'zod'
 
+export const ESPERADO_DINHEIRO = 1340 // R$ esperado em espécie (mock — dado pelo sistema)
+
+export const FechamentoCaixaSchema = z
+  .object({
+    valor_contado: z.coerce.number().positive('Informe o valor contado'),
+    motivo_diferenca: z.string().optional(),
+  })
+  .refine((d) => Math.abs(d.valor_contado - ESPERADO_DINHEIRO) <= 50 || !!d.motivo_diferenca, {
+    message: 'Motivo obrigatório quando diferença > R$ 50 (RN-09)',
+    path: ['motivo_diferenca'],
+  })
+
+export type FechamentoCaixa = z.infer<typeof FechamentoCaixaSchema>
+
 export const CartItemSchema = z.object({
   id: z.string(),
   nome: z.string(),

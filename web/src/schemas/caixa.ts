@@ -6,12 +6,6 @@ export const AberturaCaixaSchema = z.object({
 })
 export type AberturaCaixa = z.infer<typeof AberturaCaixaSchema>
 
-export const FechamentoCaixaSchema = z.object({
-  dinheiro_contado: z.coerce.number().nonnegative(),
-  motivo_diferenca: z.string().optional(),
-})
-export type FechamentoCaixa = z.infer<typeof FechamentoCaixaSchema>
-
 export const ConferenciaCaixaSchema = z.object({
   dinheiro: z.coerce.number().nonnegative(),
   motivo: z.string().optional(),
